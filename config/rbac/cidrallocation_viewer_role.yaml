@@ -1,0 +1,27 @@
+# permissions for end users to view NodeCIDRAllocations.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    app.kubernetes.io/name: clusterrole
+    app.kubernetes.io/instance: NodeCIDRAllocation-viewer-role
+    app.kubernetes.io/component: rbac
+    app.kubernetes.io/created-by: cnp-cidr-allocator
+    app.kubernetes.io/part-of: cnp-cidr-allocator
+    app.kubernetes.io/managed-by: kustomize
+  name: NodeCIDRAllocation-viewer-role
+rules:
+- apiGroups:
+  - networking.statcan.gc.ca
+  resources:
+  - NodeCIDRAllocations
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - networking.statcan.gc.ca
+  resources:
+  - NodeCIDRAllocations/status
+  verbs:
+  - get

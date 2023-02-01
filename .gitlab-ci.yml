@@ -1,0 +1,20 @@
+include:
+  - project: cloudnative/gitlab/gitlabci/kaniko-image-ci
+    ref: v1.X
+    file: .kaniko.gitlab-ci.yml
+
+variables:
+  IMAGE_REPOSITORY: artifactory.cloud.statcan.ca/cwmd-cns-docker-local/cnp-cidr-allocator
+  DOCKERFILE: "./Dockerfile"
+  DOCKLE_OPTIONS: "--ignore CIS-DI-0001"
+  HADOLINT_IGNORE: "--ignore DL3018"
+
+stages:
+  - version
+  - build
+  - scan
+  - push
+  - tag
+
+trivy:
+  allow_failure: true
