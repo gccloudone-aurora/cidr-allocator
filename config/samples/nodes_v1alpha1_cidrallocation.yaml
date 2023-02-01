@@ -1,0 +1,16 @@
+apiVersion: networking.statcan.gc.ca/v1alpha1
+kind: NodeCIDRAllocation
+metadata:
+  labels:
+    app.kubernetes.io/name: NodeCIDRAllocation
+    app.kubernetes.io/instance: cilium-poc
+    app.kubernetes.io/part-of: cnp-cidr-allocator
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/created-by: cnp-cidr-allocator
+  name: example-nodecidrallocation
+spec:
+  addressPools:
+    - 172.26.25.0/25
+    - 172.26.25.128/25
+  nodeSelector:
+    node.statcan.gc.ca/purpose: user
