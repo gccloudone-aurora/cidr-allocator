@@ -31,7 +31,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
-	nodesv1alpha1 "statcan.gc.ca/cidr-allocator/api/v1alpha1"
+	networkingv1alpha1 "statcan.gc.ca/cidr-allocator/api/v1alpha1"
 	"statcan.gc.ca/cidr-allocator/controllers"
 	//+kubebuilder:scaffold:imports
 )
@@ -44,7 +44,7 @@ var (
 func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 
-	utilruntime.Must(nodesv1alpha1.AddToScheme(scheme))
+	utilruntime.Must(networkingv1alpha1.AddToScheme(scheme))
 	//+kubebuilder:scaffold:scheme
 }
 
@@ -55,8 +55,8 @@ func main() {
 	flag.StringVar(&metricsAddr, "metrics-bind-address", ":8080", "The address the metric endpoint binds to.")
 	flag.StringVar(&probeAddr, "health-probe-bind-address", ":8081", "The address the probe endpoint binds to.")
 	flag.BoolVar(&enableLeaderElection, "leader-elect", false,
-		"Enable leader election for controller manager. "+
-			"Enabling this will ensure there is only one active controller manager.")
+		"Enable leader election for NodeCIDRAllocation controller. "+
+			"Enabling this will ensure there is only one active NodeCIDRAllocation controller.")
 	opts := zap.Options{
 		Development: true,
 	}
@@ -74,7 +74,10 @@ func main() {
 		LeaderElectionID:       "d4d6386b.statcan.gc.ca",
 	})
 	if err != nil {
-		setupLog.Error(err, "unable to start manager")
+		setupLog.Error(
+			err,
+			"unable to start NodeCIDRAllocation controller",
+		)
 		os.Exit(1)
 	}
 
@@ -83,27 +86,42 @@ func main() {
 		Scheme:   mgr.GetScheme(),
 		Recorder: mgr.GetEventRecorderFor("NodeCIDRAllocation-controller"),
 	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "NodeCIDRAllocation")
+		setupLog.Error(
+			err,
+			"unable to create controller", "controller", "NodeCIDRAllocation",
+		)
 		os.Exit(1)
 	}
-	if err = (&nodesv1alpha1.NodeCIDRAllocation{}).SetupWebhookWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create webhook", "webhook", "NodeCIDRAllocation")
+	if err = (&networkingv1alpha1.NodeCIDRAllocation{}).SetupWebhookWithManager(mgr); err != nil {
+		setupLog.Error(
+			err,
+			"unable to create webhook", "webhook", "NodeCIDRAllocation",
+		)
 		os.Exit(1)
 	}
 	//+kubebuilder:scaffold:builder
 
 	if err := mgr.AddHealthzCheck("healthz", healthz.Ping); err != nil {
-		setupLog.Error(err, "unable to set up health check")
+		setupLog.Error(
+			err,
+			"unable to set up health check",
+		)
 		os.Exit(1)
 	}
 	if err := mgr.AddReadyzCheck("readyz", healthz.Ping); err != nil {
-		setupLog.Error(err, "unable to set up ready check")
+		setupLog.Error(
+			err,
+			"unable to set up ready check",
+		)
 		os.Exit(1)
 	}
 
 	setupLog.Info("starting manager")
 	if err := mgr.Start(ctrl.SetupSignalHandler()); err != nil {
-		setupLog.Error(err, "problem running manager")
+		setupLog.Error(
+			err,
+			"problem running manager",
+		)
 		os.Exit(1)
 	}
 }

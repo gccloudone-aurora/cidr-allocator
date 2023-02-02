@@ -15,7 +15,20 @@ spec:
     singular: nodecidrallocation
   scope: Namespaced
   versions:
-  - name: v1alpha1
+  - additionalPrinterColumns:
+    - description: NodeCIDRAllocation creation timestamp
+      jsonPath: .metadata.creationTimestamp
+      name: Created
+      type: date
+    - description: NodeCIDRAllocation Address Pools
+      jsonPath: .spec.addressPools
+      name: Pools
+      type: string
+    - description: NodeCIDRAllocation NodeSelector value
+      jsonPath: .spec.nodeSelector
+      name: NodeSelector
+      type: string
+    name: v1alpha1
     schema:
       openAPIV3Schema:
         description: This is a CRD that defines a NodeCIDRAllocation resource which
@@ -58,14 +71,16 @@ spec:
                   filter nodes from the cluster for which to apply Pod CIDRs onto.
                   NOTE: Nodes that are selected through the node selector MUST specify
                   a maximum number of pods in order to help identify the correct size
-                  for the NodeCIDRAllocation Controller to allocate to it.'
+                  for the NodeCIDRAllocation Controller to allocate to it. If none
+                  is specified a subnet WILL NOT be allocated for the Node.'
                 type: object
                 x-kubernetes-map-type: atomic
             type: object
           status:
             description: NodeCIDRAllocationStatus defines the observed state of NodeCIDRAllocation
-              Assigned Nodes are tracked by watching *corev1.Node resources in the
-              cluster
+              Nodes matching the supplied .Spec.NodeSelector are tracked by watching
+              *corev1.Node resources in the cluster Actual state in the cluster is
+              calculated at runtime using information from the matching Node resources
             type: object
         type: object
     served: true

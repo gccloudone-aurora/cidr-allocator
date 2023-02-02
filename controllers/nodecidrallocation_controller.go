@@ -65,19 +65,25 @@ func (r *NodeCIDRAllocationReconciler) Reconcile(ctx context.Context, req ctrl.R
 	log := log.FromContext(ctx)
 
 	log.Info("fetching NodeCIDRAllocation resource")
-	NodeCIDRAllocation := v1alpha1.NodeCIDRAllocation{}
-	if err := r.Client.Get(ctx, req.NamespacedName, &NodeCIDRAllocation); err != nil {
-		log.Error(err, "unable to get NodeCIDRAllocation resource")
+	nodeCIDRAllocation := v1alpha1.NodeCIDRAllocation{}
+	if err := r.Client.Get(ctx, req.NamespacedName, &nodeCIDRAllocation); err != nil {
+		log.Error(
+			err,
+			"unable to get NodeCIDRAllocation resource",
+		)
 		return ctrl.Result{}, nil
 	}
 
 	log.Info("fetching matching Node resources")
 	matchingNodes := corev1.NodeList{}
 	listOptions := client.ListOptions{
-		LabelSelector: client.MatchingLabelsSelector{Selector: labels.SelectorFromSet(NodeCIDRAllocation.Spec.NodeSelector)},
+		LabelSelector: client.MatchingLabelsSelector{Selector: labels.SelectorFromSet(nodeCIDRAllocation.Spec.NodeSelector)},
 	}
 	if err := r.Client.List(ctx, &matchingNodes, &listOptions, client.InNamespace(corev1.NamespaceAll)); err != nil {
-		log.Error(err, "unable to get list of Node resources")
+		log.Error(
+			err,
+			"unable to get list of Node resources",
+		)
 		return ctrl.Result{}, nil
 	}
 
@@ -87,16 +93,19 @@ func (r *NodeCIDRAllocationReconciler) Reconcile(ctx context.Context, req ctrl.R
 	}
 
 	// implement NodeCIDRAllocation resource finalizer to handle cleanup
-	if NodeCIDRAllocation.ObjectMeta.DeletionTimestamp.IsZero() {
-		if !controllerutil.ContainsFinalizer(&NodeCIDRAllocation, finalizerName) {
-			controllerutil.AddFinalizer(&NodeCIDRAllocation, finalizerName)
-			if err := r.Update(ctx, &NodeCIDRAllocation); err != nil {
+	if nodeCIDRAllocation.ObjectMeta.DeletionTimestamp.IsZero() {
+		if !controllerutil.ContainsFinalizer(&nodeCIDRAllocation, finalizerName) {
+			controllerutil.AddFinalizer(&nodeCIDRAllocation, finalizerName)
+			if err := r.Update(ctx, &nodeCIDRAllocation); err != nil {
 				return ctrl.Result{}, err
 			}
 		}
 	} else {
-		log.Info("NodeCIDRAllocation resource is queued for deletion", "resourceName", NodeCIDRAllocation.GetName())
-		if controllerutil.ContainsFinalizer(&NodeCIDRAllocation, finalizerName) {
+		log.Info(
+			"NodeCIDRAllocation resource is queued for deletion",
+			"resourceName", nodeCIDRAllocation.GetName(),
+		)
+		if controllerutil.ContainsFinalizer(&nodeCIDRAllocation, finalizerName) {
 			readyForRemoval := true
 			for _, node := range matchingNodes.Items {
 				if node.Spec.PodCIDR != "" {
@@ -104,20 +113,27 @@ func (r *NodeCIDRAllocationReconciler) Reconcile(ctx context.Context, req ctrl.R
 						errors.New("a node allocation still exists"),
 						"there is an existing Node allocation that is still tied to this resource. waiting until all nodes watched by this NodeCIDRAllocation resource are removed",
 						"nodeName", node.GetName(),
-						"NodeCIDRAllocation", NodeCIDRAllocation.GetName(),
+						"NodeCIDRAllocation", nodeCIDRAllocation.GetName(),
 					)
 					readyForRemoval = false
 				}
 			}
 
 			if readyForRemoval {
-				controllerutil.RemoveFinalizer(&NodeCIDRAllocation, finalizerName)
-				if err := r.Update(ctx, &NodeCIDRAllocation); err != nil {
-					log.Error(err, "unable to remove finalizer from NodeCIDRAllocation resource", "NodeCIDRAllocation", NodeCIDRAllocation.GetName())
+				controllerutil.RemoveFinalizer(&nodeCIDRAllocation, finalizerName)
+				if err := r.Update(ctx, &nodeCIDRAllocation); err != nil {
+					log.Error(
+						err,
+						"unable to remove finalizer from NodeCIDRAllocation resource",
+						"NodeCIDRAllocation", nodeCIDRAllocation.GetName(),
+					)
 					return ctrl.Result{}, err
 				}
 
-				log.Info("NodeCIDRAllocation resource has been deleted after resolving finalizer", "resourceName", NodeCIDRAllocation.GetName())
+				log.Info(
+					"NodeCIDRAllocation resource has been deleted after resolving finalizer",
+					"resourceName", nodeCIDRAllocation.GetName(),
+				)
 				return ctrl.Result{}, nil
 			}
 		}
@@ -125,7 +141,7 @@ func (r *NodeCIDRAllocationReconciler) Reconcile(ctx context.Context, req ctrl.R
 
 	freeSubnets := make(map[int][]string)
 	for _, node := range matchingNodes.Items {
-		maxPods := node.Status.Allocatable.Pods().AsApproximateFloat64()
+		maxPods := node.Status.Allocatable.Pods().Value()
 		requiredMaskCIDR := SmallestCIDRForHosts(int(maxPods))
 
 		log.V(2).Info("determined Node resource PodCIDR requirements",
@@ -134,17 +150,26 @@ func (r *NodeCIDRAllocationReconciler) Reconcile(ctx context.Context, req ctrl.R
 			"requiredMaskCIDR", requiredMaskCIDR,
 		)
 
-		for _, pool := range NodeCIDRAllocation.Spec.AddressPools {
+		for _, pool := range nodeCIDRAllocation.Spec.AddressPools {
 			subnets, err := SubnetsFromPool(pool, requiredMaskCIDR)
 			if err != nil {
-				log.Error(err, "unable to break down address pool into subnets", "pool", pool, "maskCIDR", requiredMaskCIDR)
+				log.Error(
+					err,
+					"unable to break down address pool into subnets",
+					"pool", pool,
+					"maskCIDR", requiredMaskCIDR,
+				)
 				return ctrl.Result{}, err
 			}
 
 			for _, subnet := range subnets {
 				networkAllocated, err := StringNetIsAllocated(subnet, &matchingNodes)
 				if err != nil {
-					log.Error(err, "unable to determine whether subnet is already allocated", "subnet", subnet)
+					log.Error(
+						err,
+						"unable to determine whether subnet is already allocated",
+						"subnet", subnet,
+					)
 					return ctrl.Result{}, err
 				}
 
@@ -168,7 +193,12 @@ func (r *NodeCIDRAllocationReconciler) Reconcile(ctx context.Context, req ctrl.R
 				"requiredSubnetCIDR", requiredMaskCIDR,
 			)
 
-			r.Recorder.Eventf(&NodeCIDRAllocation, corev1.EventTypeWarning, "failure", "no available address space to assign PodCIDR to node (%s)", node.GetName())
+			r.Recorder.Eventf(
+				&nodeCIDRAllocation,
+				corev1.EventTypeWarning,
+				"failure",
+				"no available address space to assign PodCIDR to node (%s)", node.GetName(),
+			)
 			return ctrl.Result{}, nil
 		}
 
@@ -177,13 +207,19 @@ func (r *NodeCIDRAllocationReconciler) Reconcile(ctx context.Context, req ctrl.R
 			log.Error(err, "unable to set pod CIDR for Node resource",
 				"nodeName", node.GetName(),
 				"podCIDR", node.Spec.PodCIDR,
-				"freeAvailable", freeSubnets)
+				"freeAvailable", freeSubnets,
+			)
 
 			return ctrl.Result{}, nil
 		}
 
 		log.Info("assigned podCIDR to Node resource", "nodeName", node.GetName(), "podCIDR", node.Spec.PodCIDR, "remainingFreeSubnets", len(freeSubnets[requiredMaskCIDR]))
-		r.Recorder.Eventf(&node, corev1.EventTypeNormal, "resource updated", "PodCIDR Allocation has been applied to Node resource (%s)", node.GetName())
+		r.Recorder.Eventf(
+			&node,
+			corev1.EventTypeNormal,
+			"update",
+			"PodCIDR Allocation has been applied to Node resource (%s)", node.GetName(),
+		)
 	}
 
 	return ctrl.Result{}, nil

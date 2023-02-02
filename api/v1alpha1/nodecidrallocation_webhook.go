@@ -53,21 +53,30 @@ var _ webhook.Validator = &NodeCIDRAllocation{}
 
 // ValidateCreate implements webhook.Validator for creation validation
 func (r *NodeCIDRAllocation) ValidateCreate() error {
-	NodeCIDRAllocationlog.Info("validate create", "name", r.Name)
+	NodeCIDRAllocationlog.Info(
+		"validate create",
+		"name", r.Name,
+	)
 
 	return r.ValidateNodeCIDRAllocation()
 }
 
 // ValidateUpdate implements webhook.Validator for update validation
 func (r *NodeCIDRAllocation) ValidateUpdate(old runtime.Object) error {
-	NodeCIDRAllocationlog.Info("validate update", "name", r.Name)
+	NodeCIDRAllocationlog.Info(
+		"validate update",
+		"name", r.Name,
+	)
 
 	return r.ValidateNodeCIDRAllocation()
 }
 
 // ValidateDelete implements webhook.Validator for deletion validation (this is not enabled and this implementation will not do anything)
 func (r *NodeCIDRAllocation) ValidateDelete() error {
-	NodeCIDRAllocationlog.Info("validate delete", "name", r.Name)
+	NodeCIDRAllocationlog.Info(
+		"validate delete",
+		"name", r.Name,
+	)
 	return nil
 }
 
@@ -139,7 +148,10 @@ func (r *NodeCIDRAllocation) ValidateAddressPools(addressPools []string, fldPath
 		for _, other := range util.RemoveByVal(addressPools, pool) {
 			networkOverlapExists, err := util.StringNetIntersect(pool, other)
 			if err != nil {
-				NodeCIDRAllocationlog.Error(err, "could not determine network overlap for pool validation")
+				NodeCIDRAllocationlog.Error(
+					err,
+					"could not determine network overlap for pool validation",
+				)
 				return field.InternalError(fldPath.Child(fmt.Sprintf("%d", i)), err)
 			}
 			if networkOverlapExists {

@@ -1,4 +1,4 @@
-# Build the manager binary
+# Build the NodeCIDRAllocation controller binary
 FROM artifactory.cloud.statcan.ca/docker/golang:1.19 as builder
 ARG TARGETOS
 ARG TARGETARCH
@@ -16,13 +16,12 @@ COPY controllers/ controllers/
 COPY util/ util/
 
 # Build
-RUN CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH} go build -a -o manager main.go
+RUN CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH} go build -a -o cnp-nodecidrallocator main.go
 
-# Use distroless as minimal base image to package the manager binary
-# Refer to https://github.com/GoogleContainerTools/distroless for more details
+# Using scratch base to host binary with minimal impact/attach surface area
 FROM scratch
 WORKDIR /
-COPY --from=builder /workspace/manager .
+COPY --from=builder /workspace/cnp-nodecidrallocator .
 USER 65532:65532
 
-ENTRYPOINT ["/manager"]
+ENTRYPOINT ["/cnp-nodecidrallocator"]

@@ -35,14 +35,15 @@ type NodeCIDRAllocationSpec struct {
 	// NodeSelector represents a Kubernetes node selector to filter nodes from
 	// the cluster for which to apply Pod CIDRs onto.
 	// NOTE: Nodes that are selected through the node selector MUST specify a maximum number of pods in order to help identify
-	//       the correct size for the NodeCIDRAllocation Controller to allocate to it.
+	//       the correct size for the NodeCIDRAllocation Controller to allocate to it. If none is specified a subnet WILL NOT be allocated for the Node.
 	// +optional
 	// +mapType=atomic
 	NodeSelector map[string]string `json:"nodeSelector,omitempty" protobuf:"bytes,7,rep,name=nodeSelector"`
 }
 
 // NodeCIDRAllocationStatus defines the observed state of NodeCIDRAllocation
-// Assigned Nodes are tracked by watching *corev1.Node resources in the cluster
+// Nodes matching the supplied .Spec.NodeSelector are tracked by watching *corev1.Node resources in the cluster
+// Actual state in the cluster is calculated at runtime using information from the matching Node resources
 type NodeCIDRAllocationStatus struct{}
 
 //+kubebuilder:object:root=true
@@ -51,6 +52,9 @@ type NodeCIDRAllocationStatus struct{}
 // This is a CRD that defines a NodeCIDRAllocation resource which allows for the allocation of node pod ranges
 // to be assigned to nodes in a cluster. This is implemented using a list of network CIDRs as blocks of available address space that can be allocated
 // to nodes using a node selector to filter the nodes upon which to apply the Pod CIDRs.
+// +kubebuilder:printcolumn:name="Created",type="date",JSONPath=".metadata.creationTimestamp",description="NodeCIDRAllocation creation timestamp"
+// +kubebuilder:printcolumn:name="Pools",type="string",JSONPath=".spec.addressPools",description="NodeCIDRAllocation Address Pools"
+// +kubebuilder:printcolumn:name="NodeSelector",type="string",JSONPath=".spec.nodeSelector",description="NodeCIDRAllocation NodeSelector value"
 type NodeCIDRAllocation struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
@@ -68,6 +72,7 @@ type NodeCIDRAllocationList struct {
 	Items           []NodeCIDRAllocation `json:"items"`
 }
 
+// init Registers the NodeCIDRAllocation CRD with the provided manager Scheme
 func init() {
 	SchemeBuilder.Register(&NodeCIDRAllocation{}, &NodeCIDRAllocationList{})
 }

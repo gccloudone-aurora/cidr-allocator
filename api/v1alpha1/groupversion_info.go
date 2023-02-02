@@ -14,7 +14,7 @@ FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTH
 WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-// Package v1alpha1 contains API Schema definitions for the nodes v1alpha1 API group
+// Package v1alpha1 contains API Schema definitions for the networking.statcan.gc.ca v1alpha1 API group
 // +kubebuilder:object:generate=true
 // +groupName=networking.statcan.gc.ca
 package v1alpha1
