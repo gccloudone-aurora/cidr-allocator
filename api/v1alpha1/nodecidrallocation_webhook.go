@@ -47,7 +47,7 @@ func (r *NodeCIDRAllocation) SetupWebhookWithManager(mgr ctrl.Manager) error {
 		Complete()
 }
 
-//+kubebuilder:webhook:path=/validate-nodes-net-statcan-ca-v1alpha1-NodeCIDRAllocation,mutating=false,failurePolicy=fail,sideEffects=None,groups=networking.statcan.gc.ca,resources=NodeCIDRAllocations,verbs=create;update,versions=v1alpha1,name=vNodeCIDRAllocation.kb.io,admissionReviewVersions=v1
+//+kubebuilder:webhook:path=/validate-networking-statcan-gc-ca-v1alpha1-NodeCIDRAllocation,mutating=false,failurePolicy=fail,sideEffects=None,groups=networking.statcan.gc.ca,resources=NodeCIDRAllocations,verbs=create;update,versions=v1alpha1,name=vNodeCIDRAllocation.kb.io,admissionReviewVersions=v1
 
 var _ webhook.Validator = &NodeCIDRAllocation{}
 
