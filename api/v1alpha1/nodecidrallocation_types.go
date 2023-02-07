@@ -20,6 +20,14 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+type HealthStatus string
+
+const (
+	HealthStatusHealthy     HealthStatus = "Healthy"
+	HealthStatusProgressing HealthStatus = "Progressing"
+	HealthStatusUnhealthy   HealthStatus = "Unhealthy"
+)
+
 // NodeCIDRAllocationSpec defines the desired state of NodeCIDRAllocation
 // This CRD defines an allocation of Node Pod ranges to be assigned to nodes in the cluster
 type NodeCIDRAllocationSpec struct {
@@ -44,7 +52,24 @@ type NodeCIDRAllocationSpec struct {
 // NodeCIDRAllocationStatus defines the observed state of NodeCIDRAllocation
 // Nodes matching the supplied .Spec.NodeSelector are tracked by watching *corev1.Node resources in the cluster
 // Actual state in the cluster is calculated at runtime using information from the matching Node resources
-type NodeCIDRAllocationStatus struct{}
+// The Status for NodeCIDRAllocation will be used for reporting purposes ONLY and may not always be up-to-date with the actual state of the cluster
+type NodeCIDRAllocationStatus struct {
+	// Health represents the current health of the NodeCIDRAllocation resource
+	// Health status can be one of:
+	//    v1alpha1.HealthStatusHealthy       - Represents a NodeCIDRAllocation resource that has performed all allocations and none have failed or are in a failing state
+	//    v1alpha1.HealthStatusProgressing   - Represents a NodeCIDRAllocation resource that is progressing or otherwise does not have a determined health state
+	//    v1alpha1.HealthStatusUnhealthy     - Represents a NodeCIDRAllocation resource that is currently tracking failed node allocations or failure to calculate the correct state of the cluster
+	// +optional
+	Health HealthStatus `json:"health,omitempty"`
+
+	// ExpectedAllocations tracks the total number of Nodes being tracked for CIDR allocations using this NodeCIDRAllocation resource
+	// +optional
+	ExpectedAllocations int32 `json:"expected,omitempty"`
+
+	// CompletedAllocations tracks the total number of Nodes being tracked that have successfully completed a CIDR allocation using this NodeCIDRAllocation resource
+	// +optional
+	CompletedAllocations int32 `json:"completed,omitempty"`
+}
 
 //+kubebuilder:object:root=true
 //+kubebuilder:subresource:status
@@ -55,12 +80,41 @@ type NodeCIDRAllocationStatus struct{}
 // +kubebuilder:printcolumn:name="Created",type="date",JSONPath=".metadata.creationTimestamp",description="NodeCIDRAllocation creation timestamp"
 // +kubebuilder:printcolumn:name="Pools",type="string",JSONPath=".spec.addressPools",description="NodeCIDRAllocation Address Pools"
 // +kubebuilder:printcolumn:name="NodeSelector",type="string",JSONPath=".spec.nodeSelector",description="NodeCIDRAllocation NodeSelector value"
+// +kubebuilder:printcolumn:name="Health",type="string",JSONPath=".status.health",description="Current NodeCIDRAllocation resource Health"
+// +kubebuilder:printcolumn:name="Expected",type="integer",JSONPath=".status.expected",description="Expected number of Node allocations"
+// +kubebuilder:printcolumn:name="Completed",type="integer",JSONPath=".status.completed",description="Completed Node allocations"
 type NodeCIDRAllocation struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
 	Spec   NodeCIDRAllocationSpec   `json:"spec,omitempty"`
 	Status NodeCIDRAllocationStatus `json:"status,omitempty"`
+}
+
+func (n *NodeCIDRAllocation) HealthStatus() HealthStatus {
+	return n.Status.Health
+}
+
+func (n *NodeCIDRAllocation) ExpectedAllocations() int32 {
+	return n.Status.ExpectedAllocations
+}
+
+func (n *NodeCIDRAllocation) CompletedAllocations() int32 {
+	return n.Status.CompletedAllocations
+}
+
+func (n *NodeCIDRAllocation) SetHealthStatus(newStatus HealthStatus) {
+	if newStatus == HealthStatusHealthy || newStatus == HealthStatusProgressing || newStatus == HealthStatusUnhealthy {
+		n.Status.Health = newStatus
+	}
+}
+
+func (n *NodeCIDRAllocation) SetExpectedAllocations(expected int32) {
+	n.Status.ExpectedAllocations = expected
+}
+
+func (n *NodeCIDRAllocation) SetCompletedAllocations(completed int32) {
+	n.Status.CompletedAllocations = completed
 }
 
 //+kubebuilder:object:root=true

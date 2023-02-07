@@ -28,6 +28,18 @@ spec:
       jsonPath: .spec.nodeSelector
       name: NodeSelector
       type: string
+    - description: Current NodeCIDRAllocation resource Health
+      jsonPath: .status.health
+      name: Health
+      type: string
+    - description: Expected number of Node allocations
+      jsonPath: .status.expected
+      name: Expected
+      type: integer
+    - description: Completed Node allocations
+      jsonPath: .status.completed
+      name: Completed
+      type: integer
     name: v1alpha1
     schema:
       openAPIV3Schema:
@@ -81,6 +93,32 @@ spec:
               Nodes matching the supplied .Spec.NodeSelector are tracked by watching
               *corev1.Node resources in the cluster Actual state in the cluster is
               calculated at runtime using information from the matching Node resources
+              The Status for NodeCIDRAllocation will be used for reporting purposes
+              ONLY and may not always be up-to-date with the actual state of the cluster
+            properties:
+              completed:
+                description: CompletedAllocations tracks the total number of Nodes
+                  being tracked that have successfully completed a CIDR allocation
+                  using this NodeCIDRAllocation resource
+                format: int32
+                type: integer
+              expected:
+                description: ExpectedAllocations tracks the total number of Nodes
+                  being tracked for CIDR allocations using this NodeCIDRAllocation
+                  resource
+                format: int32
+                type: integer
+              health:
+                description: 'Health represents the current health of the NodeCIDRAllocation
+                  resource Health status can be one of: v1alpha1.HealthStatusHealthy       -
+                  Represents a NodeCIDRAllocation resource that has performed all
+                  allocations and none have failed or are in a failing state v1alpha1.HealthStatusProgressing   -
+                  Represents a NodeCIDRAllocation resource that is progressing or
+                  otherwise does not have a determined health state v1alpha1.HealthStatusUnhealthy     -
+                  Represents a NodeCIDRAllocation resource that is currently tracking
+                  failed node allocations or failure to calculate the correct state
+                  of the cluster'
+                type: string
             type: object
         type: object
     served: true

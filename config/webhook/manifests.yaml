@@ -11,7 +11,7 @@ webhooks:
     service:
       name: webhook-service
       namespace: system
-      path: /validate-nodes-net-statcan-ca-v1alpha1-NodeCIDRAllocation
+      path: /validate-networking-statcan-gc-ca-v1alpha1-NodeCIDRAllocation
   failurePolicy: Fail
   name: vNodeCIDRAllocation.kb.io
   rules:
