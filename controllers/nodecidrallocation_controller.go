@@ -88,11 +88,6 @@ func (r *NodeCIDRAllocationReconciler) Reconcile(ctx context.Context, req ctrl.R
 		return ctrl.Result{}, err
 	}
 
-	if len(matchingNodes.Items) == 0 {
-		log.Info("no matching nodes exist. skipping")
-		return ctrl.Result{}, r.UpdateNodeCIDRAllocationStatus(ctx, &nodeCIDRAllocation, &matchingNodes, nil)
-	}
-
 	// implement NodeCIDRAllocation resource finalizer to handle cleanup
 	if nodeCIDRAllocation.ObjectMeta.DeletionTimestamp.IsZero() {
 		if !controllerutil.ContainsFinalizer(&nodeCIDRAllocation, finalizerName) {
@@ -118,7 +113,7 @@ func (r *NodeCIDRAllocationReconciler) Reconcile(ctx context.Context, req ctrl.R
 				if node.Spec.PodCIDR != "" {
 					log.Error(
 						errors.New("a node allocation still exists"),
-						"there is an existing Node allocation that is still tied to this resource. waiting until all nodes watched by this NodeCIDRAllocation resource are removed",
+						"there is an existing Node allocation that is still tied to this resource. waiting until all nodes watched by this NodeCIDRAllocation resource are removed or no longer managed by this resource",
 						"nodeName", node.GetName(),
 						"NodeCIDRAllocation", nodeCIDRAllocation.GetName(),
 					)
@@ -144,6 +139,11 @@ func (r *NodeCIDRAllocationReconciler) Reconcile(ctx context.Context, req ctrl.R
 				return ctrl.Result{}, nil
 			}
 		}
+	}
+
+	if len(matchingNodes.Items) == 0 {
+		log.Info("no matching nodes exist. skipping")
+		return ctrl.Result{}, r.UpdateNodeCIDRAllocationStatus(ctx, &nodeCIDRAllocation, &matchingNodes, nil)
 	}
 
 	freeSubnets := make(map[int][]string)
@@ -267,7 +267,7 @@ func (r *NodeCIDRAllocationReconciler) UpdateNodeCIDRAllocationStatus(ctx contex
 // and returns a list of reconciliation requests for all NodeCIDRAllocation resources that have a matching NodeSelector
 func (r *NodeCIDRAllocationReconciler) triggerNodeCIDRAllocationReconcileFromNodeChange(o client.Object) []reconcile.Request {
 	allNodeCIDRAllocations := &v1alpha1.NodeCIDRAllocationList{}
-	usedByNodeCIDRAllocation := &v1alpha1.NodeCIDRAllocationList{}
+	usedByNodeCIDRAllocation := map[*v1alpha1.NodeCIDRAllocation]struct{}{} // implements a set-like structure to ensure that we only process a single reconcile for each unique match
 
 	// get all the available NodeCIDRAllocations on the cluster
 	if err := r.Client.List(context.TODO(), allNodeCIDRAllocations, &client.ListOptions{
@@ -278,19 +278,22 @@ func (r *NodeCIDRAllocationReconciler) triggerNodeCIDRAllocationReconcileFromNod
 
 	// find CIDR allocations that have a NodeSelector that points to the node that triggered this reconciliation
 	for _, item := range allNodeCIDRAllocations.Items {
-		if ObjectContainsLabel(o, item.Spec.NodeSelector) {
-			usedByNodeCIDRAllocation.Items = append(usedByNodeCIDRAllocation.Items, item)
+		if ObjectContainsLabels(o, item.Spec.NodeSelector) {
+			usedByNodeCIDRAllocation[&item] = struct{}{}
 		}
 	}
 
-	requests := make([]reconcile.Request, len(usedByNodeCIDRAllocation.Items))
-	for i, item := range usedByNodeCIDRAllocation.Items {
+	// create reconcile requests for all matching NodeCIDRAllocation resources for the Node object
+	requests := make([]reconcile.Request, len(usedByNodeCIDRAllocation))
+	i := 0
+	for used := range usedByNodeCIDRAllocation {
 		requests[i] = reconcile.Request{
 			NamespacedName: types.NamespacedName{
-				Name:      item.GetName(),
-				Namespace: item.GetNamespace(),
+				Name:      used.GetName(),
+				Namespace: used.GetNamespace(),
 			},
 		}
+		i++
 	}
 	return requests
 }

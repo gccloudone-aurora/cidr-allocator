@@ -53,15 +53,18 @@ func SubnetsFromPool(pool string, netBits int) ([]string, error) {
 	return subnets, nil
 }
 
-// ObjectContainsLabel is a utility function that parses a provided Kubernetes API client Objects'
+// ObjectContainsLabels is a utility function that parses a provided Kubernetes API client Objects'
 // labels searching for a matching label
-func ObjectContainsLabel(o client.Object, label map[string]string) bool {
-	for k, v := range o.GetLabels() {
-		if label[k] == v {
-			return true
+func ObjectContainsLabels(o client.Object, labels map[string]string) bool {
+	for lk, lv := range labels {
+		objectLabels := o.GetLabels()
+		if StringInSlice(lk, util.Keys(objectLabels)) && objectLabels[lk] == lv {
+			continue
 		}
+		return false
 	}
-	return false
+
+	return true
 }
 
 // StringNetContainsNet compares string represented CIDR networks for composition.
