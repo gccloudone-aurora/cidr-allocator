@@ -19,6 +19,7 @@ package controllers
 import (
 	"context"
 	"errors"
+	"time"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -146,6 +147,15 @@ func (r *NodeCIDRAllocationReconciler) Reconcile(ctx context.Context, req ctrl.R
 		return ctrl.Result{}, r.UpdateNodeCIDRAllocationStatus(ctx, &nodeCIDRAllocation, &matchingNodes, nil)
 	}
 
+	allClusterNodes := corev1.NodeList{}
+	if err := r.Client.List(ctx, &allClusterNodes); err != nil {
+		log.Error(
+			err,
+			"unable to list Node resources from Kubernetes API server.",
+		)
+		return ctrl.Result{RequeueAfter: 5 * time.Second}, r.UpdateNodeCIDRAllocationStatus(ctx, &nodeCIDRAllocation, &matchingNodes, err)
+	}
+
 	freeSubnets := make(map[int][]string)
 	for _, node := range matchingNodes.Items {
 		maxPods := node.Status.Allocatable.Pods().Value()
@@ -171,17 +181,21 @@ func (r *NodeCIDRAllocationReconciler) Reconcile(ctx context.Context, req ctrl.R
 			}
 
 			for _, subnet := range subnets {
-				networkAllocated, err := StringNetIsAllocated(subnet, &matchingNodes)
+				networkAllocated, err := StringNetIsAllocated(subnet, &allClusterNodes)
 				if err != nil {
 					log.Error(
 						err,
 						"unable to determine whether subnet is already allocated",
 						"subnet", subnet,
 					)
-
 					return ctrl.Result{}, r.UpdateNodeCIDRAllocationStatus(ctx, &nodeCIDRAllocation, &matchingNodes, err)
 				}
 
+				log.V(2).Info(
+					"performed network allocation check",
+					"subnet", subnet,
+					"networkAllocated", networkAllocated,
+				)
 				if !networkAllocated && !StringInSlice(subnet, freeSubnets[requiredMaskCIDR]) {
 					freeSubnets[requiredMaskCIDR] = append(freeSubnets[requiredMaskCIDR], subnet)
 				}
@@ -202,15 +216,13 @@ func (r *NodeCIDRAllocationReconciler) Reconcile(ctx context.Context, req ctrl.R
 				"requiredSubnetCIDR", requiredMaskCIDR,
 			)
 
-			r.Recorder.Eventf(
-				&nodeCIDRAllocation,
-				corev1.EventTypeWarning,
-				"failure",
-				"no available address space to assign PodCIDR to node (%s)", node.GetName(),
-			)
-
 			return ctrl.Result{}, r.UpdateNodeCIDRAllocationStatus(ctx, &nodeCIDRAllocation, &matchingNodes, errors.New("no available address space to allocate"))
 		}
+
+		log.V(2).Info(
+			"listing free subnets for size",
+			"freeSubnets", freeSubnets[requiredMaskCIDR],
+		)
 
 		node.Spec.PodCIDR, freeSubnets[requiredMaskCIDR] = freeSubnets[requiredMaskCIDR][0], freeSubnets[requiredMaskCIDR][1:]
 		if err := r.Update(ctx, &node); err != nil {

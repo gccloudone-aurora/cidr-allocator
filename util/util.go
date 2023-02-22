@@ -30,7 +30,7 @@ func StringNetIntersect(a, b string) (bool, error) {
 		return false, err
 	}
 
-	return aNet.Contains(bNet.IP()) || bNet.Contains(aNet.IP()), nil
+	return a == b || aNet.Contains(bNet.IP()) || bNet.Contains(aNet.IP()), nil
 }
 
 // Keys takes a map and returns a list of keys from that map
