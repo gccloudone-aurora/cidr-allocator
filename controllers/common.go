@@ -67,21 +67,6 @@ func ObjectContainsLabels(o client.Object, labels map[string]string) bool {
 	return true
 }
 
-// StringNetContainsNet compares string represented CIDR networks for composition.
-// Returns true if `a` contains `b`
-func StringNetContainsNet(a, b string) (bool, error) {
-	_, aNet, err := iplib.ParseCIDR(a)
-	if err != nil {
-		return true, err
-	}
-	_, bNet, err := iplib.ParseCIDR(b)
-	if err != nil {
-		return true, err
-	}
-
-	return aNet.ContainsNet(bNet), nil
-}
-
 // StringInSlice looks for exact matches of the supplied string query in the supplied string slice
 // Returns true if 's' is in [arr]
 func StringInSlice(s string, arr []string) bool {
@@ -102,16 +87,12 @@ func StringNetIsAllocated(subnet string, nodes *corev1.NodeList) (bool, error) {
 			continue
 		}
 
-		subnetContainsNodeNet, err := StringNetContainsNet(subnet, n.Spec.PodCIDR)
-		if err != nil {
-			return false, err
-		}
 		networkOverlapExists, err := util.StringNetIntersect(subnet, n.Spec.PodCIDR)
 		if err != nil {
 			return false, err
 		}
 
-		if subnetContainsNodeNet || networkOverlapExists {
+		if networkOverlapExists || subnet == n.Spec.PodCIDR {
 			return true, nil
 		}
 	}
