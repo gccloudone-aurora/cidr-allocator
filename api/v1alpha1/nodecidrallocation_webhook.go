@@ -29,7 +29,9 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
-	"statcan.gc.ca/cidr-allocator/util"
+
+	pkg_net "statcan.gc.ca/cidr-allocator/pkg/networking"
+	"statcan.gc.ca/cidr-allocator/pkg/util"
 )
 
 // log is for logging in this package.
@@ -80,6 +82,7 @@ func (r *NodeCIDRAllocation) ValidateDelete() error {
 	return nil
 }
 
+// ValidateNodeCIDRAllocation will work to validate a new NodeCIDRAllocation resource
 func (r *NodeCIDRAllocation) ValidateNodeCIDRAllocation() error {
 	var errs field.ErrorList
 	if err := r.ValidateName(); err != nil {
@@ -99,6 +102,7 @@ func (r *NodeCIDRAllocation) ValidateNodeCIDRAllocation() error {
 		r.Name, errs)
 }
 
+// ValidateName performs validation on a NodeCIDRAllocation name field
 func (r *NodeCIDRAllocation) ValidateName() *field.Error {
 	if len(r.ObjectMeta.Name) <= 0 || len(r.ObjectMeta.Name) > 63 {
 		return field.Invalid(field.NewPath("metadata").Child("name"), r.Name, "NodeCIDRAllocation name cannot be empty and cannot exceed 63 characters in length")
@@ -107,6 +111,7 @@ func (r *NodeCIDRAllocation) ValidateName() *field.Error {
 	return nil
 }
 
+// ValidateSpec performs validation on the NodeCIDRAllocation spec fields
 func (r *NodeCIDRAllocation) ValidateSpec() *field.Error {
 	if err := r.ValidateNodeSelector(r.Spec.NodeSelector, field.NewPath("spec").Child("nodeSelector")); err != nil {
 		return err
@@ -119,6 +124,7 @@ func (r *NodeCIDRAllocation) ValidateSpec() *field.Error {
 	return nil
 }
 
+// ValidateNodeSelector will perform validation on a NodeSelector for the NodeCIDRAllocation resource spec
 func (r *NodeCIDRAllocation) ValidateNodeSelector(nodeSelector map[string]string, fldPath *field.Path) *field.Error {
 	if len(nodeSelector) != 1 {
 		return field.Invalid(fldPath, nodeSelector, "A single NodeSelector MUST be specified for this resource")
@@ -135,6 +141,7 @@ func (r *NodeCIDRAllocation) ValidateNodeSelector(nodeSelector map[string]string
 	return nil
 }
 
+// ValidateAddressPools will perform validation on address pools for the NodeCIDRAllocation resource spec
 func (r *NodeCIDRAllocation) ValidateAddressPools(addressPools []string, fldPath *field.Path) *field.Error {
 	if len(addressPools) == 0 {
 		return field.Invalid(fldPath, addressPools, "AddressPools must contain at least one entry")
@@ -146,7 +153,7 @@ func (r *NodeCIDRAllocation) ValidateAddressPools(addressPools []string, fldPath
 		}
 
 		for _, other := range util.RemoveByVal(addressPools, pool) {
-			networkOverlapExists, err := util.StringNetIntersect(pool, other)
+			networkOverlapExists, err := pkg_net.StringNetIntersect(pool, other)
 			if err != nil {
 				NodeCIDRAllocationlog.Error(
 					err,

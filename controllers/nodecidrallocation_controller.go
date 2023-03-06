@@ -31,6 +31,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/log"
+	"sigs.k8s.io/controller-runtime/pkg/metrics"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	"sigs.k8s.io/controller-runtime/pkg/builder"
@@ -39,6 +40,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
 	"statcan.gc.ca/cidr-allocator/api/v1alpha1"
+	pkg_metrics "statcan.gc.ca/cidr-allocator/pkg/metrics"
+	pkg_net "statcan.gc.ca/cidr-allocator/pkg/networking"
 )
 
 const (
@@ -100,7 +103,7 @@ func (r *NodeCIDRAllocationReconciler) Reconcile(ctx context.Context, req ctrl.R
 					"resourceName", nodeCIDRAllocation.GetName(),
 				)
 
-				return ctrl.Result{}, r.UpdateNodeCIDRAllocationStatus(ctx, &nodeCIDRAllocation, &matchingNodes, err)
+				return ctrl.Result{}, r.finalizeReconcile(ctx, &nodeCIDRAllocation, &matchingNodes, err)
 			}
 		}
 	} else {
@@ -130,7 +133,7 @@ func (r *NodeCIDRAllocationReconciler) Reconcile(ctx context.Context, req ctrl.R
 						"unable to remove finalizer from NodeCIDRAllocation resource",
 						"NodeCIDRAllocation", nodeCIDRAllocation.GetName(),
 					)
-					return ctrl.Result{}, r.UpdateNodeCIDRAllocationStatus(ctx, &nodeCIDRAllocation, &matchingNodes, err)
+					return ctrl.Result{}, r.finalizeReconcile(ctx, &nodeCIDRAllocation, &matchingNodes, err)
 				}
 
 				log.Info(
@@ -144,7 +147,7 @@ func (r *NodeCIDRAllocationReconciler) Reconcile(ctx context.Context, req ctrl.R
 
 	if len(matchingNodes.Items) == 0 {
 		log.Info("no matching nodes exist. skipping")
-		return ctrl.Result{}, r.UpdateNodeCIDRAllocationStatus(ctx, &nodeCIDRAllocation, &matchingNodes, nil)
+		return ctrl.Result{}, r.finalizeReconcile(ctx, &nodeCIDRAllocation, &matchingNodes, nil)
 	}
 
 	allClusterNodes := corev1.NodeList{}
@@ -153,13 +156,13 @@ func (r *NodeCIDRAllocationReconciler) Reconcile(ctx context.Context, req ctrl.R
 			err,
 			"unable to list Node resources from Kubernetes API server.",
 		)
-		return ctrl.Result{RequeueAfter: 5 * time.Second}, r.UpdateNodeCIDRAllocationStatus(ctx, &nodeCIDRAllocation, &matchingNodes, err)
+		return ctrl.Result{RequeueAfter: 5 * time.Second}, r.finalizeReconcile(ctx, &nodeCIDRAllocation, &matchingNodes, err)
 	}
 
 	freeSubnets := make(map[int][]string)
 	for _, node := range matchingNodes.Items {
 		maxPods := node.Status.Allocatable.Pods().Value()
-		requiredMaskCIDR := SmallestCIDRForHosts(int(maxPods))
+		requiredMaskCIDR := pkg_net.SmallestCIDRForHosts(int(maxPods))
 
 		log.V(2).Info("determined Node resource PodCIDR requirements",
 			"nodeName", node.GetName(),
@@ -168,7 +171,7 @@ func (r *NodeCIDRAllocationReconciler) Reconcile(ctx context.Context, req ctrl.R
 		)
 
 		for _, pool := range nodeCIDRAllocation.Spec.AddressPools {
-			subnets, err := SubnetsFromPool(pool, requiredMaskCIDR)
+			subnets, err := pkg_net.SubnetsFromPool(pool, requiredMaskCIDR)
 			if err != nil {
 				log.Error(
 					err,
@@ -177,18 +180,18 @@ func (r *NodeCIDRAllocationReconciler) Reconcile(ctx context.Context, req ctrl.R
 					"maskCIDR", requiredMaskCIDR,
 				)
 
-				return ctrl.Result{}, r.UpdateNodeCIDRAllocationStatus(ctx, &nodeCIDRAllocation, &matchingNodes, err)
+				return ctrl.Result{}, r.finalizeReconcile(ctx, &nodeCIDRAllocation, &matchingNodes, err)
 			}
 
 			for _, subnet := range subnets {
-				networkAllocated, err := StringNetIsAllocated(subnet, &allClusterNodes)
+				networkAllocated, err := pkg_net.StringNetIsAllocated(subnet, &allClusterNodes)
 				if err != nil {
 					log.Error(
 						err,
 						"unable to determine whether subnet is already allocated",
 						"subnet", subnet,
 					)
-					return ctrl.Result{}, r.UpdateNodeCIDRAllocationStatus(ctx, &nodeCIDRAllocation, &matchingNodes, err)
+					return ctrl.Result{}, r.finalizeReconcile(ctx, &nodeCIDRAllocation, &matchingNodes, err)
 				}
 
 				log.V(2).Info(
@@ -216,7 +219,7 @@ func (r *NodeCIDRAllocationReconciler) Reconcile(ctx context.Context, req ctrl.R
 				"requiredSubnetCIDR", requiredMaskCIDR,
 			)
 
-			return ctrl.Result{}, r.UpdateNodeCIDRAllocationStatus(ctx, &nodeCIDRAllocation, &matchingNodes, errors.New("no available address space to allocate"))
+			return ctrl.Result{}, r.finalizeReconcile(ctx, &nodeCIDRAllocation, &matchingNodes, errors.New("no available address space to allocate"))
 		}
 
 		log.V(2).Info(
@@ -232,7 +235,7 @@ func (r *NodeCIDRAllocationReconciler) Reconcile(ctx context.Context, req ctrl.R
 				"freeAvailable", freeSubnets,
 			)
 
-			return ctrl.Result{}, r.UpdateNodeCIDRAllocationStatus(ctx, &nodeCIDRAllocation, &matchingNodes, err)
+			return ctrl.Result{}, r.finalizeReconcile(ctx, &nodeCIDRAllocation, &matchingNodes, err)
 		}
 
 		log.Info("assigned podCIDR to Node resource", "nodeName", node.GetName(), "podCIDR", node.Spec.PodCIDR, "remainingFreeSubnets", len(freeSubnets[requiredMaskCIDR]))
@@ -245,12 +248,49 @@ func (r *NodeCIDRAllocationReconciler) Reconcile(ctx context.Context, req ctrl.R
 	}
 
 	// Everything is good, update current status and complete reconcile
-	return ctrl.Result{}, r.UpdateNodeCIDRAllocationStatus(ctx, &nodeCIDRAllocation, &matchingNodes, nil)
+	return ctrl.Result{}, r.finalizeReconcile(ctx, &nodeCIDRAllocation, &matchingNodes, nil)
 }
 
-// UpdateNodeCIDRAllocationStatus will calculate the current state of Cluster Node allocations for all matching Nodes from the provided NodeCIDRAllocation CR
-// This function will additionally update Health of the NodeCIDRAllocation resource according to it's perceived state.
-func (r *NodeCIDRAllocationReconciler) UpdateNodeCIDRAllocationStatus(ctx context.Context, nodeCIDRAllocation *v1alpha1.NodeCIDRAllocation, nodes *corev1.NodeList, err error) error {
+// finalizeReconcile performs any final tasks/functions before the reconcile will be considered complete.
+// this function will pass-through any errors so that information is not lost, but we can use it to adjust status and metric information
+func (r *NodeCIDRAllocationReconciler) finalizeReconcile(ctx context.Context, nodeCIDRAllocation *v1alpha1.NodeCIDRAllocation, nodes *corev1.NodeList, err error) error {
+	r.updateNodeCIDRAllocationStatus(ctx, nodeCIDRAllocation, nodes, err)
+	r.updatePrometheusMetrics(ctx)
+	return err
+}
+
+// updatePrometheusMetrics will capture metrics for cluster-wide usage of the NodeCIDRAllocator.
+// metrics are aggregate and considers all nodes and all NodeCIDRAllocation resources in its processes
+func (r *NodeCIDRAllocationReconciler) updatePrometheusMetrics(ctx context.Context) {
+	log := log.FromContext(ctx)
+	allNodeCIDRAllocations := v1alpha1.NodeCIDRAllocationList{}
+	if fErr := r.Client.List(ctx, &allNodeCIDRAllocations); fErr != nil {
+		log.Error(
+			fErr,
+			"unable to get NodeCIDRAllocationList resource. cannot update metrics",
+		)
+		return
+	}
+
+	allNodes := corev1.NodeList{}
+	if fErr := r.Client.List(ctx, &allNodes); fErr != nil {
+		log.Error(
+			fErr,
+			"unable to get NodeList resource. cannot update metrics",
+		)
+		return
+	}
+
+	// calculate and update metrics
+	pkg_metrics.Update(&allNodeCIDRAllocations, &allNodes)
+}
+
+// updateNodeCIDRAllocationStatus will calculate the current state of Cluster Node allocations for all matching Nodes from the provided NodeCIDRAllocation
+// This function will additionally update Health of the NodeCIDRAllocation resource according to it's perceived state. The perceived state is then stored in
+// the associated NodeCIDRAllocation's Status.
+func (r *NodeCIDRAllocationReconciler) updateNodeCIDRAllocationStatus(ctx context.Context, nodeCIDRAllocation *v1alpha1.NodeCIDRAllocation, nodes *corev1.NodeList, err error) {
+	log := log.FromContext(ctx)
+
 	nodeCIDRAllocation.SetExpectedAllocations(int32(len(nodes.Items)))
 	nodeCIDRAllocation.SetCompletedAllocations(0)
 	nodeCIDRAllocation.SetHealthStatus(v1alpha1.HealthStatusHealthy)
@@ -269,10 +309,11 @@ func (r *NodeCIDRAllocationReconciler) UpdateNodeCIDRAllocationStatus(ctx contex
 	}
 
 	if err := r.Status().Update(ctx, nodeCIDRAllocation); err != nil {
-		return err
+		log.Error(
+			err,
+			"unable to update resource status for NodeCIDRAllocation",
+		)
 	}
-
-	return err
 }
 
 // triggerNodeCIDRAllocationReconcileFromNodeChange is a mapping function which takes a Node object
@@ -326,4 +367,9 @@ func (r *NodeCIDRAllocationReconciler) SetupWithManager(mgr ctrl.Manager) error 
 		).
 		WithOptions(controller.Options{MaxConcurrentReconciles: 0}).
 		Complete(r)
+}
+
+// init registers custom metrics
+func init() {
+	metrics.Registry.MustRegister(pkg_metrics.Get()...)
 }

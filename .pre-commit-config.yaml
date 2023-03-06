@@ -63,3 +63,8 @@ repos:
         args: [ "errcheck" ]
         always_run: true
         verbose: true
+    -   name: go-make-manifests
+        id: my-cmd-repo
+        args: [ "make", "all" ]
+        always_run: true
+        verbose: true

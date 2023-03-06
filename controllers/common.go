@@ -17,41 +17,9 @@ WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN 
 package controllers
 
 import (
-	"fmt"
-	"math"
-	"net"
-
-	"github.com/c-robinson/iplib"
-	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"statcan.gc.ca/cidr-allocator/util"
+	"statcan.gc.ca/cidr-allocator/pkg/util"
 )
-
-// SmallestCIDRForHosts calculates the smallest number of network bits required to
-// satisfy the required number of hosts supplied
-func SmallestCIDRForHosts(requiredHosts int) int {
-	return 32 - int(math.Ceil(math.Log2(float64(requiredHosts+2))))
-}
-
-// SubnetsFromPool breaks down the supplied pool into all possible subnets of the supplied size (given by netBits)
-func SubnetsFromPool(pool string, netBits int) ([]string, error) {
-	_, poolNet, err := net.ParseCIDR(pool)
-	if err != nil {
-		return []string{}, err
-	}
-	poolNetBits, _ := poolNet.Mask.Size()
-	numSubnets := int(math.Pow(2, float64(netBits-poolNetBits)))
-
-	subnets := make([]string, numSubnets)
-	for i := 0; i < numSubnets; i++ {
-		offset := i * (int(math.Pow(2, float64(32-netBits))))
-
-		nextSub := iplib.IncrementIP4By(poolNet.IP, uint32(offset))
-		subnets[i] = fmt.Sprintf("%s/%d", nextSub, netBits)
-	}
-
-	return subnets, nil
-}
 
 // ObjectContainsLabels is a utility function that parses a provided Kubernetes API client Objects'
 // labels searching for a matching label
@@ -76,26 +44,4 @@ func StringInSlice(s string, arr []string) bool {
 		}
 	}
 	return false
-}
-
-// StringNetIsAllocated uses a variety of conditions to ensure that there is no
-// conflicting allocation that would present problems for subnet.
-// returns (true,nil) when the subnet provided is not allocated by or overlapping with any nodes.
-func StringNetIsAllocated(subnet string, nodes *corev1.NodeList) (bool, error) {
-	for _, n := range nodes.Items {
-		if n.Spec.PodCIDR == "" {
-			continue
-		}
-
-		networkOverlapExists, err := util.StringNetIntersect(subnet, n.Spec.PodCIDR)
-		if err != nil {
-			return false, err
-		}
-
-		if networkOverlapExists || subnet == n.Spec.PodCIDR {
-			return true, nil
-		}
-	}
-
-	return false, nil
 }
