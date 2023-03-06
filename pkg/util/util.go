@@ -16,26 +16,9 @@ WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN 
 
 package util
 
-import "github.com/c-robinson/iplib"
-
-// StringNetIntersect determines whether the supplied networks (in CIDR format)
-// are overlapping or otherwise have an intersection between them
-func StringNetIntersect(a, b string) (bool, error) {
-	_, aNet, err := iplib.ParseCIDR(a)
-	if err != nil {
-		return false, err
-	}
-	_, bNet, err := iplib.ParseCIDR(b)
-	if err != nil {
-		return false, err
-	}
-
-	return a == b || aNet.Contains(bNet.IP()) || bNet.Contains(aNet.IP()), nil
-}
-
 // Keys takes a map and returns a list of keys from that map
-func Keys[T comparable](m map[T]T) []T {
-	keys := make([]T, len(m))
+func Keys[K, V comparable](m map[K]V) []K {
+	keys := make([]K, len(m))
 
 	i := 0
 	for k := range m {

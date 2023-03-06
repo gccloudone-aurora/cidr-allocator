@@ -91,28 +91,34 @@ type NodeCIDRAllocation struct {
 	Status NodeCIDRAllocationStatus `json:"status,omitempty"`
 }
 
+// HealthStatus will return the current Health status field for the NodeCIDRAllocation
 func (n *NodeCIDRAllocation) HealthStatus() HealthStatus {
 	return n.Status.Health
 }
 
+// ExpectedAllocations will return the current number of expected allocations from the NodeCIDRAllocation status field
 func (n *NodeCIDRAllocation) ExpectedAllocations() int32 {
 	return n.Status.ExpectedAllocations
 }
 
+// CompletedAllocations will return the current number of completed and healthy allocations from the NodeCIDRAllocation status field
 func (n *NodeCIDRAllocation) CompletedAllocations() int32 {
 	return n.Status.CompletedAllocations
 }
 
+// SetHealthStatus is a helper function to set/update the Health status field
 func (n *NodeCIDRAllocation) SetHealthStatus(newStatus HealthStatus) {
 	if newStatus == HealthStatusHealthy || newStatus == HealthStatusProgressing || newStatus == HealthStatusUnhealthy {
 		n.Status.Health = newStatus
 	}
 }
 
+// SetExpectedAllocations is a helper function to set/update the ExpectedAllocations status field
 func (n *NodeCIDRAllocation) SetExpectedAllocations(expected int32) {
 	n.Status.ExpectedAllocations = expected
 }
 
+// SetCompletedAllocations is a helper function to set/update the CompletedAllocations status field
 func (n *NodeCIDRAllocation) SetCompletedAllocations(completed int32) {
 	n.Status.CompletedAllocations = completed
 }
