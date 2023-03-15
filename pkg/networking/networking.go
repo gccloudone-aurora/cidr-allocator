@@ -25,52 +25,66 @@ import (
 	corev1 "k8s.io/api/core/v1"
 )
 
-// SmallestCIDRForHosts calculates the smallest number of network bits required to
+// SmallestMaskForNumHosts calculates the smallest number of network bits required to
 // satisfy the required number of hosts supplied
-func SmallestCIDRForHosts(requiredHosts int) int {
-	return 32 - int(math.Ceil(math.Log2(float64(requiredHosts+2))))
-}
-
-// UsableHosts will calculate the total number of usable hosts provided a number of 1s (or network-assigned bits) from a network mask
-// desired is the total number of network assigned bits for the desired inner network/subnet
-// max (optional) is the total size of an outer network that is not the default maximum (default: 32)
-func NetHosts(desired float64, max ...float64) float64 {
-	m := float64(32)
-	if len(max) > 0 && max[0] > 0 && max[0] <= 32 {
-		m = float64(max[0])
+// this will never result in a value less than 0
+func SmallestMaskForNumHosts(requiredHosts uint32) (uint8, error) {
+	res := 32 - int(math.Ceil(math.Log2(float64(requiredHosts+2))))
+	if res < 0 {
+		return 0, fmt.Errorf("resulting CIDR for %d required hosts specified is invalid. result was %d", requiredHosts, res)
 	}
 
-	return math.Pow(2, float64(m-desired))
+	return uint8(res), nil
 }
 
-// UsableHosts is an alias for removing 2 unusable hosts (subnet addr, broadcast) from the total network hosts from `NetHosts()`
-func UsableHosts(desired float64, max ...float64) float64 {
-	return NetHosts(desired, max...) - 2
+// NumHostsForMask will calculate the total number of addresses provided a number of 1s (network mask) from a network address
+// ones is the total number of network assigned bits in the network mask
+func NumHostsForMask(ones uint8) (uint32, error) {
+	m := uint8(32)
+	if ones > 32 || ones < 1 {
+		return 0, fmt.Errorf("invalid desired network bits (ones) specified. %d. must be 1 <= ones <= 32", ones)
+	}
+
+	return uint32(math.Ceil(math.Pow(2, float64(m-ones)))), nil
 }
 
-// SubnetsFromPool breaks down the supplied pool into all possible subnets of the supplied size (given by netBits)
-func SubnetsFromPool(pool string, netBits int) ([]string, error) {
+// NumUsableHostsForMask is an alias for removing 2 unusable/reserved host addresses (subnet addr, broadcast) from the total network hosts from `NetHosts()`
+func NumUsableHostsForMask(ones uint8) (uint32, error) {
+	total, err := NumHostsForMask(ones)
+	if err != nil {
+		return 0, err
+	}
+
+	return total - 2, nil
+}
+
+// SubnetsFromPool breaks down the supplied pool into all possible subnets of the supplied size (given by ones)
+func SubnetsFromPool(pool string, ones uint8) ([]string, error) {
 	_, poolNet, err := net.ParseCIDR(pool)
 	if err != nil {
 		return []string{}, err
 	}
-	poolNetBits, _ := poolNet.Mask.Size()
-	numSubnets := int(math.Pow(2, float64(netBits-poolNetBits)))
+	poolNetOnes, _ := poolNet.Mask.Size()
+	numSubnets := uint32(math.Pow(2, float64(ones-uint8(poolNetOnes))))
 
 	subnets := make([]string, numSubnets)
-	for i := 0; i < numSubnets; i++ {
-		offset := i * int(NetHosts(float64(netBits)))
+	for i := uint32(0); i < numSubnets; i++ {
+		netSize, err := NumHostsForMask(ones)
+		if err != nil {
+			return []string{}, err
+		}
+		offset := i * uint32(netSize)
 
 		nextSub := iplib.IncrementIP4By(poolNet.IP, uint32(offset))
-		subnets[i] = fmt.Sprintf("%s/%d", nextSub, netBits)
+		subnets[i] = fmt.Sprintf("%s/%d", nextSub, ones)
 	}
 
 	return subnets, nil
 }
 
-// StringNetIntersect determines whether the supplied networks (in CIDR format)
+// NetworksOverlap determines whether the supplied networks (in CIDR format)
 // are overlapping or otherwise have an intersection between them
-func StringNetIntersect(a, b string) (bool, error) {
+func NetworksOverlap(a, b string) (bool, error) {
 	_, aNet, err := iplib.ParseCIDR(a)
 	if err != nil {
 		return false, err
@@ -83,21 +97,21 @@ func StringNetIntersect(a, b string) (bool, error) {
 	return a == b || aNet.Contains(bNet.IP()) || bNet.Contains(aNet.IP()), nil
 }
 
-// StringNetIsAllocated uses a variety of conditions to ensure that there is no
+// NetworkAllocated uses a variety of conditions to ensure that there is no
 // conflicting allocation that would present problems for subnet.
 // returns (true,nil) when the subnet provided is not allocated by or overlapping with any nodes.
-func StringNetIsAllocated(subnet string, nodes *corev1.NodeList) (bool, error) {
+func NetworkAllocated(subnet string, nodes *corev1.NodeList) (bool, error) {
 	for _, n := range nodes.Items {
 		if n.Spec.PodCIDR == "" {
 			continue
 		}
 
-		networkOverlapExists, err := StringNetIntersect(subnet, n.Spec.PodCIDR)
+		networksOverlap, err := NetworksOverlap(subnet, n.Spec.PodCIDR)
 		if err != nil {
 			return false, err
 		}
 
-		if networkOverlapExists || subnet == n.Spec.PodCIDR {
+		if networksOverlap {
 			return true, nil
 		}
 	}
