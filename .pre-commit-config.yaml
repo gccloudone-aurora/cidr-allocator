@@ -5,27 +5,25 @@ repos:
     #
     # Go Build
     #
-    -   id: go-build-mod
-        always_run: true
-        verbose: true
     -   id: go-build-repo-mod
         always_run: true
         verbose: true
+    
+    #
+    # Go Test
+    #
+    -   id: go-test-repo-mod
+        verbose: true
+
     #
     # Go Vet
     #
-    -   id: go-vet-mod
-        always_run: true
-        verbose: true
     -   id: go-vet-repo-mod
         always_run: true
         verbose: true
     #
     # StaticCheck
     #
-    -   id: go-staticcheck-mod
-        always_run: true
-        verbose: true
     -   id: go-staticcheck-repo-mod
         always_run: true
         verbose: true
@@ -38,13 +36,7 @@ repos:
     #
     # Formatters
     #
-    -   id: go-fmt
-        always_run: true
-        verbose: true
     -   id: go-fmt-repo
-        always_run: true
-        verbose: true
-    -   id: go-imports
         always_run: true
         verbose: true
     -   id: go-imports-repo
@@ -53,11 +45,6 @@ repos:
     #
     # Custom Hooks
     #
-    -   name: go-errcheck-mod
-        id: my-cmd-mod
-        args: [ "errcheck" ]
-        always_run: true
-        verbose: true
     -   name: go-errcheck-repo
         id: my-cmd-repo
         args: [ "errcheck" ]

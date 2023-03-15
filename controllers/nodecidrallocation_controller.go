@@ -159,32 +159,41 @@ func (r *NodeCIDRAllocationReconciler) Reconcile(ctx context.Context, req ctrl.R
 		return ctrl.Result{RequeueAfter: 5 * time.Second}, r.finalizeReconcile(ctx, &nodeCIDRAllocation, &matchingNodes, err)
 	}
 
-	freeSubnets := make(map[int][]string)
+	freeSubnets := make(map[uint8][]string)
 	for _, node := range matchingNodes.Items {
 		maxPods := node.Status.Allocatable.Pods().Value()
-		requiredMaskCIDR := pkg_net.SmallestCIDRForHosts(int(maxPods))
+		requiredCIDRMask, err := pkg_net.SmallestMaskForNumHosts(uint32(maxPods))
+		if err != nil {
+			log.Error(
+				err,
+				"unable to calculate the required CIDR mask for the specified number of required hosts",
+				"requiredHosts", maxPods,
+			)
+
+			return ctrl.Result{}, r.finalizeReconcile(ctx, &nodeCIDRAllocation, &matchingNodes, err)
+		}
 
 		log.V(2).Info("determined Node resource PodCIDR requirements",
 			"nodeName", node.GetName(),
 			"maxPods", maxPods,
-			"requiredMaskCIDR", requiredMaskCIDR,
+			"requiredMaskCIDR", requiredCIDRMask,
 		)
 
 		for _, pool := range nodeCIDRAllocation.Spec.AddressPools {
-			subnets, err := pkg_net.SubnetsFromPool(pool, requiredMaskCIDR)
+			subnets, err := pkg_net.SubnetsFromPool(pool, requiredCIDRMask)
 			if err != nil {
 				log.Error(
 					err,
 					"unable to break down address pool into subnets",
 					"pool", pool,
-					"maskCIDR", requiredMaskCIDR,
+					"maskCIDR", requiredCIDRMask,
 				)
 
 				return ctrl.Result{}, r.finalizeReconcile(ctx, &nodeCIDRAllocation, &matchingNodes, err)
 			}
 
 			for _, subnet := range subnets {
-				networkAllocated, err := pkg_net.StringNetIsAllocated(subnet, &allClusterNodes)
+				networkAllocated, err := pkg_net.NetworkAllocated(subnet, &allClusterNodes)
 				if err != nil {
 					log.Error(
 						err,
@@ -199,8 +208,8 @@ func (r *NodeCIDRAllocationReconciler) Reconcile(ctx context.Context, req ctrl.R
 					"subnet", subnet,
 					"networkAllocated", networkAllocated,
 				)
-				if !networkAllocated && !StringInSlice(subnet, freeSubnets[requiredMaskCIDR]) {
-					freeSubnets[requiredMaskCIDR] = append(freeSubnets[requiredMaskCIDR], subnet)
+				if !networkAllocated && !StringInSlice(subnet, freeSubnets[requiredCIDRMask]) {
+					freeSubnets[requiredCIDRMask] = append(freeSubnets[requiredCIDRMask], subnet)
 				}
 			}
 		}
@@ -213,10 +222,10 @@ func (r *NodeCIDRAllocationReconciler) Reconcile(ctx context.Context, req ctrl.R
 			continue
 		}
 
-		if len(freeSubnets[requiredMaskCIDR]) == 0 {
+		if len(freeSubnets[requiredCIDRMask]) == 0 {
 			log.Info("unable to allocate podCIDR for node. no available address space. you may want to add some additional pools",
 				"nodeName", node.GetName(),
-				"requiredSubnetCIDR", requiredMaskCIDR,
+				"requiredSubnetCIDR", requiredCIDRMask,
 			)
 
 			return ctrl.Result{}, r.finalizeReconcile(ctx, &nodeCIDRAllocation, &matchingNodes, errors.New("no available address space to allocate"))
@@ -224,10 +233,10 @@ func (r *NodeCIDRAllocationReconciler) Reconcile(ctx context.Context, req ctrl.R
 
 		log.V(2).Info(
 			"listing free subnets for size",
-			"freeSubnets", freeSubnets[requiredMaskCIDR],
+			"freeSubnets", freeSubnets[requiredCIDRMask],
 		)
 
-		node.Spec.PodCIDR, freeSubnets[requiredMaskCIDR] = freeSubnets[requiredMaskCIDR][0], freeSubnets[requiredMaskCIDR][1:]
+		node.Spec.PodCIDR, freeSubnets[requiredCIDRMask] = freeSubnets[requiredCIDRMask][0], freeSubnets[requiredCIDRMask][1:]
 		if err := r.Update(ctx, &node); err != nil {
 			log.Error(err, "unable to set pod CIDR for Node resource",
 				"nodeName", node.GetName(),
@@ -238,7 +247,7 @@ func (r *NodeCIDRAllocationReconciler) Reconcile(ctx context.Context, req ctrl.R
 			return ctrl.Result{}, r.finalizeReconcile(ctx, &nodeCIDRAllocation, &matchingNodes, err)
 		}
 
-		log.Info("assigned podCIDR to Node resource", "nodeName", node.GetName(), "podCIDR", node.Spec.PodCIDR, "remainingFreeSubnets", len(freeSubnets[requiredMaskCIDR]))
+		log.Info("assigned podCIDR to Node resource", "nodeName", node.GetName(), "podCIDR", node.Spec.PodCIDR, "remainingFreeSubnets", len(freeSubnets[requiredCIDRMask]))
 		r.Recorder.Eventf(
 			&node,
 			corev1.EventTypeNormal,

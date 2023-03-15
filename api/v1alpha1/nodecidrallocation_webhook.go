@@ -153,7 +153,7 @@ func (r *NodeCIDRAllocation) ValidateAddressPools(addressPools []string, fldPath
 		}
 
 		for _, other := range util.RemoveByVal(addressPools, pool) {
-			networkOverlapExists, err := pkg_net.StringNetIntersect(pool, other)
+			networkOverlapExists, err := pkg_net.NetworksOverlap(pool, other)
 			if err != nil {
 				NodeCIDRAllocationlog.Error(
 					err,

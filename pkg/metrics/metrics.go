@@ -20,6 +20,7 @@ import (
 	"net"
 
 	"github.com/prometheus/client_golang/prometheus"
+	dto "github.com/prometheus/client_model/go"
 	corev1 "k8s.io/api/core/v1"
 
 	"statcan.gc.ca/cidr-allocator/api/v1alpha1"
@@ -59,6 +60,22 @@ func Get() []prometheus.Collector {
 	}
 }
 
+func ExpectedAllocations() prometheus.Gauge {
+	return metricsExpectedAllocations
+}
+
+func ActualAllocations() prometheus.Gauge {
+	return metricsActualAllocations
+}
+
+func AvailableHosts() prometheus.Gauge {
+	return metricsAvailableHosts
+}
+
+func AvailableHostsPercent() prometheus.Gauge {
+	return metricsAvailableHostsPercent
+}
+
 // Update performs an update to ALL available metrics captured for the operator. These are not to be accessed or supplied via the `Get()` function,
 // but rather from the local package variables. Metrics will be exposed via `Get()` outside of the package
 func Update(nodeCIDRAllocations *v1alpha1.NodeCIDRAllocationList, allNodes *corev1.NodeList) {
@@ -90,15 +107,20 @@ func Update(nodeCIDRAllocations *v1alpha1.NodeCIDRAllocationList, allNodes *core
 }
 
 // accumulatedHosts will calculate the total number of hosts accumulated for all networkCIDRs that are passed
-func accumulatedHosts(networkCIDRs []string) float64 {
-	var totalSupportedHosts float64
+func accumulatedHosts(networkCIDRs []string) uint32 {
+	var totalSupportedHosts uint32
 	for _, n := range networkCIDRs {
 		_, ipNet, err := net.ParseCIDR(n)
 		if err != nil {
 			continue
 		}
-		networkBits, _ := ipNet.Mask.Size()
-		totalSupportedHosts += pkg_net.UsableHosts(float64(networkBits))
+		networkOnes, _ := ipNet.Mask.Size()
+		networkSize, err := pkg_net.NumHostsForMask(uint8(networkOnes))
+		if err != nil {
+			continue
+		}
+
+		totalSupportedHosts += networkSize
 	}
 
 	return totalSupportedHosts
@@ -106,6 +128,30 @@ func accumulatedHosts(networkCIDRs []string) float64 {
 
 // calculateRemainingHosts is a helper function to calculate remaining hosts given total available hosts and the number of hosts that are already allocated.
 // this function returns both the total count of available hosts and a ratio (as a percent) of hosts left that are allocable.
-func calculateRemainingHosts(totalAvailableHosts, totalAllocatedHosts float64) (float64, float64) {
-	return (totalAvailableHosts - totalAllocatedHosts), (1.0 - (totalAllocatedHosts / totalAvailableHosts)) * 100
+func calculateRemainingHosts(totalAvailableHosts, totalAllocatedHosts uint32) (float64, float64) {
+	return float64(totalAvailableHosts - totalAllocatedHosts), (1.0 - (float64(totalAllocatedHosts) / float64(totalAvailableHosts))) * 100
+}
+
+// GetMetricValue is a helper function from the metrics package to
+// pull metric values as floats from prometheus metrics collectors.
+//
+// Currently, it supports only Counter and Gauge metrics.
+func GetMetricValue(col prometheus.Collector) float64 {
+	c := make(chan prometheus.Metric, 1)
+	col.Collect(c)
+	m := dto.Metric{}
+	err := (<-c).Write(&m)
+	if err != nil {
+		return -1
+	}
+
+	if _, ok := col.(prometheus.Gauge); ok {
+		return *m.Gauge.Value
+	}
+
+	if _, ok := col.(prometheus.Counter); ok {
+		return *m.Counter.Value
+	}
+
+	return -1
 }
