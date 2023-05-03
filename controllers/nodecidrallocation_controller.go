@@ -60,6 +60,7 @@ type NodeCIDRAllocationReconciler struct {
 //+kubebuilder:rbac:groups=networking.statcan.gc.ca,resources=nodecidrallocations/status,verbs=get;update;patch
 //+kubebuilder:rbac:groups=networking.statcan.gc.ca,resources=nodecidrallocations/finalizers,verbs=update
 //+kubebuilder:rbac:groups="",resources=nodes,verbs=get;list;patch;update;watch
+//+kubebuilder:rbac:groups="",resources=events,verbs=create;patch
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state
@@ -251,8 +252,8 @@ func (r *NodeCIDRAllocationReconciler) Reconcile(ctx context.Context, req ctrl.R
 		r.Recorder.Eventf(
 			&node,
 			corev1.EventTypeNormal,
-			"update",
-			"PodCIDR Allocation has been applied to Node resource (%s)", node.GetName(),
+			"Updated",
+			"PodCIDR Allocation has been applied to Node resource (%s -> %s)", node.Spec.PodCIDR, node.GetName(),
 		)
 	}
 

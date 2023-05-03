@@ -4,7 +4,7 @@ include:
     file: .kaniko.gitlab-ci.yml
 
 variables:
-  IMAGE_REPOSITORY: artifactory.cloud.statcan.ca/cwmd-cns-docker-local/cnp-cidr-allocator
+  IMAGE_REPOSITORY: artifactory.cloud.statcan.ca/cwmd-cns-docker-local/cidr-allocator
   DOCKERFILE: "./Dockerfile"
   DOCKLE_OPTIONS: "--ignore CIS-DI-0001"
   HADOLINT_IGNORE: "--ignore DL3018"

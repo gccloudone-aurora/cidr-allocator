@@ -1,12 +1,16 @@
-# CNP-CIDR-Allocator
+# cidr-allocator
 
 Used to allocate podCIDR subnets to nodes from a pool
 
 ## Description
 
-CNP-CIDR-Allocator is a Kubernetes operator consisting of a CRD and Controller. The controller expects a `NodeCIDRAllocation` custom resource (CR) to be specified that will identify `addressPools` that will be used as a basis for CIDR allocation. The CR also expects a `NodeSelector` to be specified so that the controller can identify which nodes should be targeted for CIDR allocations.
+cidr-allocator is a Kubernetes operator consisting of a CRD and Controller. The controller expects a `NodeCIDRAllocation` custom resource (CR) to be specified that will identify `addressPools` that will be used as a basis for CIDR allocation. The CR also expects a `NodeSelector` to be specified so that the controller can identify which nodes should be targeted for CIDR allocations.
 
 For an example, please take a look at [config/samples](/config/samples/)
+
+## Changelog
+
+Changes to this project are tracked in the [CHANGELOG](/CHANGELOG.md) which uses the [keepachangelog](https://keepachangelog.com/en/1.0.0/) format.
 
 ### How it works
 This project aims to follow the Kubernetes [Operator pattern](https://kubernetes.io/docs/concepts/extend-kubernetes/operator/).

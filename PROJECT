@@ -5,7 +5,7 @@
 domain: statcan.gc.ca
 layout:
 - go.kubebuilder.io/v3
-projectName: cnp-cidr-allocator
+projectName: cidr-allocator
 repo: statcan.gc.ca/cidr-allocator
 resources:
 - api:

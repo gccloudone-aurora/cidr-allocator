@@ -6,8 +6,8 @@ metadata:
     app.kubernetes.io/name: clusterrole
     app.kubernetes.io/instance: nodecidrallocation-editor-role
     app.kubernetes.io/component: rbac
-    app.kubernetes.io/created-by: cnp-cidr-allocator
-    app.kubernetes.io/part-of: cnp-cidr-allocator
+    app.kubernetes.io/created-by: cidr-allocator
+    app.kubernetes.io/part-of: cidr-allocator
     app.kubernetes.io/managed-by: kustomize
   name: nodecidrallocation-editor-role
 rules:

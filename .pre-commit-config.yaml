@@ -8,7 +8,7 @@ repos:
     -   id: go-build-repo-mod
         always_run: true
         verbose: true
-    
+
     #
     # Go Test
     #
