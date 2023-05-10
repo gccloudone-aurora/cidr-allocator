@@ -4,12 +4,12 @@ metadata:
   labels:
     app.kubernetes.io/name: nodecidrallocation
     app.kubernetes.io/instance: nodecidrallocation-sample
-    app.kubernetes.io/part-of: cnp-cidr-allocator
+    app.kubernetes.io/part-of: cidr-allocator
     app.kubernetes.io/managed-by: kustomize
-    app.kubernetes.io/created-by: cnp-cidr-allocator
+    app.kubernetes.io/created-by: cidr-allocator
   name: nodecidrallocation-sample
 spec:
   addressPools:
     - X.X.X.X/XX
   nodeSelector:
-    app.kubernetes.io/name: XXXXXXX  
+    app.kubernetes.io/name: XXXXXXX

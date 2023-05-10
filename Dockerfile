@@ -27,16 +27,16 @@ RUN go mod download
 # Copy the go source
 COPY main.go main.go
 COPY api/ api/
-COPY pkg/ pkg/ 
+COPY pkg/ pkg/
 COPY controllers/ controllers/
 
 # Build
-RUN CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH} go build -a -o cnp-nodecidrallocator main.go
+RUN CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH} go build -a -o nodecidrallocator main.go
 
 # Using scratch base to host binary with minimal impact/attach surface area
 FROM scratch
 WORKDIR /
-COPY --from=builder /workspace/cnp-nodecidrallocator .
+COPY --from=builder /workspace/nodecidrallocator .
 USER 65532:65532
 
-ENTRYPOINT ["/cnp-nodecidrallocator"]
+ENTRYPOINT ["/nodecidrallocator"]
