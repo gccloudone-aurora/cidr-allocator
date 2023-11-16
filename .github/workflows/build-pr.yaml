@@ -40,8 +40,8 @@ jobs:
           tags: statcan/cidr-allocator:${{ env.TAG }}
           labels: ${{ steps.meta.outputs.labels }}
           build-args: |
-            IMAGE_REPOSITORY='docker.io/library'
-            VERSION='${{ env.TAG }}'
+            IMAGE_REPOSITORY=docker.io/library
+            VERSION=${{ env.TAG }}
       -
         name: Image digest
         run: echo ${{ steps.docker_build.outputs.digest }}
