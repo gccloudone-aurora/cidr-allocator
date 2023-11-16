@@ -5,9 +5,10 @@ include:
 
 variables:
   IMAGE_REPOSITORY: artifactory.cloud.statcan.ca/cwmd-cns-docker-local/cidr-allocator
+  KANIKO_OPTIONS: "--build-arg IMAGE_REPOSITORY=artifactory.cloud.statcan.ca/docker"
   DOCKERFILE: "./Dockerfile"
   DOCKLE_OPTIONS: "--ignore CIS-DI-0001"
-  HADOLINT_IGNORE: "--ignore DL3018"
+  HADOLINT_IGNORE: "--ignore DL3018 --ignore DL3026"
 
 stages:
   - version
