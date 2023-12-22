@@ -18,6 +18,7 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"os"
 
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
@@ -26,6 +27,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/apimachinery/pkg/util/uuid"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
@@ -41,37 +43,84 @@ var (
 	setupLog = ctrl.Log.WithName("setup")
 )
 
-func init() {
-	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
+// lookupEnvOrDefault is a short helper function which provides a way to lookup environment variables and return a default if nothing is set
+func lookupEnvOrDefault(key string, defaultValue string) string {
+	v, ok := os.LookupEnv(key)
+	if !ok {
+		return defaultValue
+	}
+	return v
+}
 
+var (
+	// leaderElectionID represents the lock/lease identity used in leader-election
+	leaderElectionID string
+	// metricsAddr represents the address that the metric endpoint binds to
+	metricsAddr string
+	// probeAddr Is the address that the health probe endpoint binds to
+	probeAddr string
+	// enableLeaderElection specifies whether or not leader election should be used for the controller manager
+	enableLeaderElection bool
+	// developmentLogging specifies whether to enable Development (Debug) logging for ZAP. Otherwise, Zap Production logging will be used
+	developmentLogging bool
+)
+
+func init() {
+	// Configure CLI arguments
+	flag.StringVar(
+		&metricsAddr,
+		"metrics-bind-address",
+		lookupEnvOrDefault("METRICS_BIND_ADDR", ":9003"),
+		"The address the metric endpoint binds to.",
+	)
+	flag.StringVar(
+		&probeAddr,
+		"health-probe-bind-address",
+		lookupEnvOrDefault("HEALTH_PROBE_BIND_ADDR", ":8081"),
+		"The address the probe endpoint binds to.",
+	)
+	flag.StringVar(
+		&leaderElectionID,
+		"leader-election-id",
+		lookupEnvOrDefault("LEADER_ELECTION_ID",
+			fmt.Sprintf("%s-cidr-allocator-leader.statcan.gc.ca", uuid.NewUUID())),
+		"The identity to use for leader-election",
+	)
+	flag.BoolVar(
+                &enableLeaderElection,
+		"leader-elect",
+		false,
+		"Enable leader election for controller manager. Enabling this will ensure there is only one active controller manager.",
+	)
+	flag.BoolVar(
+		&developmentLogging,
+		"dev-mode",
+		false,
+		"Enable development mode (Logging)",
+	)
+
+	opts := zap.Options{
+		Development: developmentLogging,
+	}
+	opts.BindFlags(flag.CommandLine)
+	flag.Parse()
+
+	// Configure ZAP Logger
+	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
+
+	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 	utilruntime.Must(networkingv1alpha1.AddToScheme(scheme))
 	//+kubebuilder:scaffold:scheme
 }
 
 func main() {
-	var metricsAddr string
-	var enableLeaderElection bool
-	var probeAddr string
-	flag.StringVar(&metricsAddr, "metrics-bind-address", ":9003", "The address the metric endpoint binds to.")
-	flag.StringVar(&probeAddr, "health-probe-bind-address", ":8081", "The address the probe endpoint binds to.")
-	flag.BoolVar(&enableLeaderElection, "leader-elect", false,
-		"Enable leader election for NodeCIDRAllocation controller. "+
-			"Enabling this will ensure there is only one active NodeCIDRAllocation controller.")
-	opts := zap.Options{
-		Development: true,
-	}
-	opts.BindFlags(flag.CommandLine)
-	flag.Parse()
-
-	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
-
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
 		Scheme:                 scheme,
 		MetricsBindAddress:     metricsAddr,
 		Port:                   9443,
 		HealthProbeBindAddress: probeAddr,
 		LeaderElection:         enableLeaderElection,
-		LeaderElectionID:       "d4d6386b.statcan.gc.ca",
+		LeaderElectionID:       leaderElectionID,
 	})
 	if err != nil {
 		setupLog.Error(
