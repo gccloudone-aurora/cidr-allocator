@@ -87,7 +87,7 @@ func init() {
 		"The identity to use for leader-election",
 	)
 	flag.BoolVar(
-                &enableLeaderElection,
+		&enableLeaderElection,
 		"leader-elect",
 		false,
 		"Enable leader election for controller manager. Enabling this will ensure there is only one active controller manager.",
