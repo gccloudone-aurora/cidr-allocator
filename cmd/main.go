@@ -1,40 +1,42 @@
 /*
-MIT License
+Copyright 2024 Statistics Canada.
 
-Copyright (c) His Majesty the King in Right of Canada, as represented by the Minister responsible for Statistics Canada, 2023
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
 
-Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"),
-to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,
-and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+    http://www.apache.org/licenses/LICENSE-2.0
 
-The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
 */
 
 package main
 
 import (
+	"crypto/tls"
 	"flag"
-	"fmt"
 	"os"
 
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
 	// to ensure that exec-entrypoint and run can make use of them.
+
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
-	"k8s.io/apimachinery/pkg/util/uuid"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
+	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
+	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
-	networkingv1alpha1 "statcan.gc.ca/cidr-allocator/api/v1alpha1"
-	"statcan.gc.ca/cidr-allocator/controllers"
+	networkingstatcangccav1alpha1 "statcan.gc.ca/cidr-allocator/api/v1alpha1"
+	"statcan.gc.ca/cidr-allocator/internal/controller"
 	//+kubebuilder:scaffold:imports
 )
 
@@ -63,6 +65,10 @@ var (
 	enableLeaderElection bool
 	// developmentLogging specifies whether to enable Development (Debug) logging for ZAP. Otherwise, Zap Production logging will be used
 	developmentLogging bool
+	// secureMetrics specifies whether the metrics endpoint is served over https
+	secureMetrics bool
+	// enableHTTP2 specifies that HTTP/2 will be enabled for the metrics and webhook servers (if exists)
+	enableHTTP2 bool
 )
 
 func init() {
@@ -82,8 +88,7 @@ func init() {
 	flag.StringVar(
 		&leaderElectionID,
 		"leader-election-id",
-		lookupEnvOrDefault("LEADER_ELECTION_ID",
-			fmt.Sprintf("%s-cidr-allocator-leader.statcan.gc.ca", uuid.NewUUID())),
+		lookupEnvOrDefault("LEADER_ELECTION_ID", "cidr-allocator-leader.networking.statcan.gc.ca"),
 		"The identity to use for leader-election",
 	)
 	flag.BoolVar(
@@ -94,9 +99,21 @@ func init() {
 	)
 	flag.BoolVar(
 		&developmentLogging,
-		"dev-mode",
+		"dev-logging",
 		false,
-		"Enable development mode (Logging)",
+		"Enable development logging",
+	)
+	flag.BoolVar(
+		&secureMetrics,
+		"metrics-secure",
+		false,
+		"If set, the metrics endpoint is served over https",
+	)
+	flag.BoolVar(
+		&enableHTTP2,
+		"enable-http2",
+		false,
+		"If set, HTTP/2 will be enabled for the metrics and webhook servers (if exists)",
 	)
 
 	opts := zap.Options{
@@ -109,68 +126,69 @@ func init() {
 	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
 
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
-	utilruntime.Must(networkingv1alpha1.AddToScheme(scheme))
+	utilruntime.Must(networkingstatcangccav1alpha1.AddToScheme(scheme))
 	//+kubebuilder:scaffold:scheme
 }
 
 func main() {
+	// if the enable-http2 flag is false (the default), http/2 should be disabled
+	// due to its vulnerabilities. More specifically, disabling http/2 will
+	// prevent from being vulnerable to the HTTP/2 Stream Cancelation and
+	// Rapid Reset CVEs. For more information see:
+	// - https://github.com/advisories/GHSA-qppj-fm5r-hxr3
+	// - https://github.com/advisories/GHSA-4374-p667-p6c8
+	disableHTTP2 := func(c *tls.Config) {
+		setupLog.Info("disabling http/2")
+		c.NextProtos = []string{"http/1.1"}
+	}
+
+	tlsOpts := []func(*tls.Config){}
+	if !enableHTTP2 {
+		tlsOpts = append(tlsOpts, disableHTTP2)
+	}
+
+	webhookServer := webhook.NewServer(webhook.Options{
+		TLSOpts: tlsOpts,
+	})
+
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
-		Scheme:                 scheme,
-		MetricsBindAddress:     metricsAddr,
-		Port:                   9443,
+		Scheme: scheme,
+		Metrics: metricsserver.Options{
+			BindAddress:   metricsAddr,
+			SecureServing: secureMetrics,
+			TLSOpts:       tlsOpts,
+		},
+		WebhookServer:          webhookServer,
 		HealthProbeBindAddress: probeAddr,
 		LeaderElection:         enableLeaderElection,
 		LeaderElectionID:       leaderElectionID,
 	})
 	if err != nil {
-		setupLog.Error(
-			err,
-			"unable to start NodeCIDRAllocation controller",
-		)
+		setupLog.Error(err, "unable to start manager")
 		os.Exit(1)
 	}
 
-	if err = (&controllers.NodeCIDRAllocationReconciler{
-		Client:   mgr.GetClient(),
-		Scheme:   mgr.GetScheme(),
-		Recorder: mgr.GetEventRecorderFor("NodeCIDRAllocation-controller"),
+	if err = (&controller.NodeCIDRAllocationReconciler{
+		Client: mgr.GetClient(),
+		Scheme: mgr.GetScheme(),
 	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(
-			err,
-			"unable to create controller", "controller", "NodeCIDRAllocation",
-		)
-		os.Exit(1)
-	}
-	if err = (&networkingv1alpha1.NodeCIDRAllocation{}).SetupWebhookWithManager(mgr); err != nil {
-		setupLog.Error(
-			err,
-			"unable to create webhook", "webhook", "NodeCIDRAllocation",
-		)
+		setupLog.Error(err, "unable to create controller", "controller", "NodeCIDRAllocation")
 		os.Exit(1)
 	}
 	//+kubebuilder:scaffold:builder
 
 	if err := mgr.AddHealthzCheck("healthz", healthz.Ping); err != nil {
-		setupLog.Error(
-			err,
-			"unable to set up health check",
-		)
+		setupLog.Error(err, "unable to set up health check")
 		os.Exit(1)
 	}
 	if err := mgr.AddReadyzCheck("readyz", healthz.Ping); err != nil {
-		setupLog.Error(
-			err,
-			"unable to set up ready check",
-		)
+		setupLog.Error(err, "unable to set up ready check")
 		os.Exit(1)
 	}
 
 	setupLog.Info("starting manager")
 	if err := mgr.Start(ctrl.SetupSignalHandler()); err != nil {
-		setupLog.Error(
-			err,
-			"problem running manager",
-		)
+		setupLog.Error(err, "problem running manager")
 		os.Exit(1)
 	}
 }

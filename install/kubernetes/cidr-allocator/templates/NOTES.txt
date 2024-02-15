@@ -1,0 +1,15 @@
+=============================
+== CIDR-ALLOCATOR DEPLOYED ==
+=============================
+
+{{- if eq (len .Values.nodeCIDRAllocations) 0 -}}
+No PodTracker CRs were deployed.
+{{- else -}}
+The following PodTrackers have been deployed along-side the operator
+
+{{ range .Values.nodeCIDRAllocations }}
+- name: {{ .name }}
+  nodeSelector: {{ default "{}" (toYaml .nodeSelector | nindent 4) }}
+  addressPools: {{ default "{}" (toYaml .addressPools | nindent 4) }}
+{{ end }}
+{{- end -}}

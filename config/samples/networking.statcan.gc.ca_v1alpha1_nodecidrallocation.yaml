@@ -9,7 +9,4 @@ metadata:
     app.kubernetes.io/created-by: cidr-allocator
   name: nodecidrallocation-sample
 spec:
-  addressPools:
-    - X.X.X.X/XX
-  nodeSelector:
-    app.kubernetes.io/name: XXXXXXX
+  # TODO(user): Add fields here

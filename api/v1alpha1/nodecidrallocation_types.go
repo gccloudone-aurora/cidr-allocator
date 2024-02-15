@@ -1,7 +1,7 @@
 /*
 MIT License
 
-Copyright (c) His Majesty the King in Right of Canada, as represented by the Minister responsible for Statistics Canada, 2023
+Copyright (c) His Majesty the King in Right of Canada, as represented by the Minister responsible for Statistics Canada, 2024
 
 Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"),
 to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,
@@ -35,17 +35,17 @@ type NodeCIDRAllocationSpec struct {
 	// network CIDRs that can be allocated to nodes running in the cluster.
 	// These pools exist as a base subnet for the allocation of dynamically sized and positioned podCIDRs which will be
 	// applied to Nodes that match the provided node selector
-	// +required
-	// +patchStrategy=merge
-	// +kubebuilder:validation:MinItems=1
+	//+required
+	//+patchStrategy=merge
+	//+kubebuilder:validation:MinItems=1
 	AddressPools []string `json:"addressPools,omitempty" protobuf:"bytes,7,opt,name=addressPools" patchStrategy:"merge"`
 
 	// NodeSelector represents a Kubernetes node selector to filter nodes from
 	// the cluster for which to apply Pod CIDRs onto.
 	// NOTE: Nodes that are selected through the node selector MUST specify a maximum number of pods in order to help identify
 	//       the correct size for the NodeCIDRAllocation Controller to allocate to it. If none is specified a subnet WILL NOT be allocated for the Node.
-	// +optional
-	// +mapType=atomic
+	//+optional
+	//+mapType=atomic
 	NodeSelector map[string]string `json:"nodeSelector,omitempty" protobuf:"bytes,7,rep,name=nodeSelector"`
 }
 
@@ -59,22 +59,22 @@ type NodeCIDRAllocationStatus struct {
 	//    v1alpha1.HealthStatusHealthy       - Represents a NodeCIDRAllocation resource that has performed all allocations and none have failed or are in a failing state
 	//    v1alpha1.HealthStatusProgressing   - Represents a NodeCIDRAllocation resource that is progressing or otherwise does not have a determined health state
 	//    v1alpha1.HealthStatusUnhealthy     - Represents a NodeCIDRAllocation resource that is currently tracking failed node allocations or failure to calculate the correct state of the cluster
-	// +optional
+	//+optional
 	Health HealthStatus `json:"health,omitempty"`
 
 	// ExpectedAllocations tracks the total number of Nodes being tracked for CIDR allocations using this NodeCIDRAllocation resource
-	// +optional
+	//+optional
 	ExpectedAllocations int32 `json:"expected,omitempty"`
 
 	// CompletedAllocations tracks the total number of Nodes being tracked that have successfully completed a CIDR allocation using this NodeCIDRAllocation resource
-	// +optional
+	//+optional
 	CompletedAllocations int32 `json:"completed,omitempty"`
 }
 
 //+kubebuilder:object:root=true
 //+kubebuilder:subresource:status
 
-// This is a CRD that defines a NodeCIDRAllocation resource which allows for the allocation of node pod ranges
+// This is a CRD that defines a NodeCIDRAllocation resource which allows for the allocation of PodCIDRs / Pod Subnets to Kubernetes Nodes
 // to be assigned to nodes in a cluster. This is implemented using a list of network CIDRs as blocks of available address space that can be allocated
 // to nodes using a node selector to filter the nodes upon which to apply the Pod CIDRs.
 // +kubebuilder:printcolumn:name="Created",type="date",JSONPath=".metadata.creationTimestamp",description="NodeCIDRAllocation creation timestamp"

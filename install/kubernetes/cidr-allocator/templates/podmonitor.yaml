@@ -1,0 +1,34 @@
+{{- if and .Values.prometheus.enabled (and .Values.prometheus.podmonitor.enabled .Values.prometheus.servicemonitor.enabled) }}
+{{- fail "Either .Values.prometheus.podmonitor.enabled or .Values.prometheus.servicemonitor.enabled can be enabled at a time, but not both." }}
+{{- else if and .Values.prometheus.enabled .Values.prometheus.podmonitor.enabled }}
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: {{ include "cidr-allocator.fullname" . }}
+  labels:
+    {{- include "cidr-allocator.labels" . | nindent 4 }}
+    prometheus: {{ .Values.prometheus.podmonitor.prometheusInstance }}
+    {{- with .Values.prometheus.podmonitor.labels }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+{{- if .Values.prometheus.podmonitor.annotations }}
+  annotations:
+    {{- with .Values.prometheus.podmonitor.annotations }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+{{- end }}
+spec:
+  jobLabel: {{ include "cidr-allocator.fullname" . }}
+  selector:
+    matchLabels:
+      {{- include "cidr-allocator.selectorLabels" . | nindent 6 }}
+  podMetricsEndpoints:
+    - port: http-metrics
+      path: {{ .Values.prometheus.podmonitor.path }}
+      interval: {{ .Values.prometheus.podmonitor.interval }}
+      scrapeTimeout: {{ .Values.prometheus.podmonitor.scrapeTimeout }}
+      honorLabels: {{ .Values.prometheus.podmonitor.honorLabels }}
+      {{- with .Values.prometheus.servicemonitor.endpointAdditionalProperties }}
+      {{- toYaml . | nindent 4 }}
+      {{- end }}
+{{- end }}

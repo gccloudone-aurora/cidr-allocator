@@ -1,7 +1,7 @@
 /*
 MIT License
 
-Copyright (c) His Majesty the King in Right of Canada, as represented by the Minister responsible for Statistics Canada, 2023
+Copyright (c) His Majesty the King in Right of Canada, as represented by the Minister responsible for Statistics Canada, 2024
 
 Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"),
 to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,
@@ -14,7 +14,7 @@ FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTH
 WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-package controllers
+package controller
 
 import (
 	"context"
@@ -28,7 +28,6 @@ import (
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/metrics"
@@ -37,11 +36,11 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
-	"sigs.k8s.io/controller-runtime/pkg/source"
 
 	"statcan.gc.ca/cidr-allocator/api/v1alpha1"
-	pkg_metrics "statcan.gc.ca/cidr-allocator/pkg/metrics"
-	pkg_net "statcan.gc.ca/cidr-allocator/pkg/networking"
+	"statcan.gc.ca/cidr-allocator/internal/helper"
+	statcan_metrics "statcan.gc.ca/cidr-allocator/internal/metrics"
+	statcan_net "statcan.gc.ca/cidr-allocator/internal/networking"
 )
 
 const (
@@ -163,7 +162,7 @@ func (r *NodeCIDRAllocationReconciler) Reconcile(ctx context.Context, req ctrl.R
 	freeSubnets := make(map[uint8][]string)
 	for _, node := range matchingNodes.Items {
 		maxPods := node.Status.Allocatable.Pods().Value()
-		requiredCIDRMask, err := pkg_net.SmallestMaskForNumHosts(uint32(maxPods))
+		requiredCIDRMask, err := statcan_net.SmallestMaskForNumHosts(uint32(maxPods))
 		if err != nil {
 			log.Error(
 				err,
@@ -181,7 +180,7 @@ func (r *NodeCIDRAllocationReconciler) Reconcile(ctx context.Context, req ctrl.R
 		)
 
 		for _, pool := range nodeCIDRAllocation.Spec.AddressPools {
-			subnets, err := pkg_net.SubnetsFromPool(pool, requiredCIDRMask)
+			subnets, err := statcan_net.SubnetsFromPool(pool, requiredCIDRMask)
 			if err != nil {
 				log.Error(
 					err,
@@ -194,7 +193,7 @@ func (r *NodeCIDRAllocationReconciler) Reconcile(ctx context.Context, req ctrl.R
 			}
 
 			for _, subnet := range subnets {
-				networkAllocated, err := pkg_net.NetworkAllocated(subnet, &allClusterNodes)
+				networkAllocated, err := statcan_net.NetworkAllocated(subnet, &allClusterNodes)
 				if err != nil {
 					log.Error(
 						err,
@@ -209,7 +208,7 @@ func (r *NodeCIDRAllocationReconciler) Reconcile(ctx context.Context, req ctrl.R
 					"subnet", subnet,
 					"networkAllocated", networkAllocated,
 				)
-				if !networkAllocated && !StringInSlice(subnet, freeSubnets[requiredCIDRMask]) {
+				if !networkAllocated && !helper.StringInSlice(subnet, freeSubnets[requiredCIDRMask]) {
 					freeSubnets[requiredCIDRMask] = append(freeSubnets[requiredCIDRMask], subnet)
 				}
 			}
@@ -292,7 +291,7 @@ func (r *NodeCIDRAllocationReconciler) updatePrometheusMetrics(ctx context.Conte
 	}
 
 	// calculate and update metrics
-	pkg_metrics.Update(&allNodeCIDRAllocations, &allNodes)
+	statcan_metrics.Update(&allNodeCIDRAllocations, &allNodes)
 }
 
 // updateNodeCIDRAllocationStatus will calculate the current state of Cluster Node allocations for all matching Nodes from the provided NodeCIDRAllocation
@@ -328,7 +327,7 @@ func (r *NodeCIDRAllocationReconciler) updateNodeCIDRAllocationStatus(ctx contex
 
 // triggerNodeCIDRAllocationReconcileFromNodeChange is a mapping function which takes a Node object
 // and returns a list of reconciliation requests for all NodeCIDRAllocation resources that have a matching NodeSelector
-func (r *NodeCIDRAllocationReconciler) triggerNodeCIDRAllocationReconcileFromNodeChange(o client.Object) []reconcile.Request {
+func (r *NodeCIDRAllocationReconciler) triggerNodeCIDRAllocationReconcileFromNodeChange(ctx context.Context, o client.Object) []reconcile.Request {
 	allNodeCIDRAllocations := &v1alpha1.NodeCIDRAllocationList{}
 	usedByNodeCIDRAllocation := map[*v1alpha1.NodeCIDRAllocation]struct{}{} // implements a set-like structure to ensure that we only process a single reconcile for each unique match
 
@@ -341,7 +340,7 @@ func (r *NodeCIDRAllocationReconciler) triggerNodeCIDRAllocationReconcileFromNod
 
 	// find CIDR allocations that have a NodeSelector that points to the node that triggered this reconciliation
 	for _, item := range allNodeCIDRAllocations.Items {
-		if ObjectContainsLabels(o, item.Spec.NodeSelector) {
+		if helper.ObjectContainsLabels(o, item.Spec.NodeSelector) {
 			usedByNodeCIDRAllocation[&item] = struct{}{}
 		}
 	}
@@ -369,17 +368,16 @@ func (r *NodeCIDRAllocationReconciler) SetupWithManager(mgr ctrl.Manager) error 
 			builder.WithPredicates(predicate.GenerationChangedPredicate{}),
 		).
 		Watches(
-			&source.Kind{Type: &corev1.Node{}},
+			&corev1.Node{},
 			handler.EnqueueRequestsFromMapFunc(r.triggerNodeCIDRAllocationReconcileFromNodeChange),
 			builder.WithPredicates(predicate.Or(
 				predicate.LabelChangedPredicate{},
 			)),
 		).
-		WithOptions(controller.Options{MaxConcurrentReconciles: 0}).
 		Complete(r)
 }
 
 // init registers custom metrics
 func init() {
-	metrics.Registry.MustRegister(pkg_metrics.Get()...)
+	metrics.Registry.MustRegister(statcan_metrics.Get()...)
 }
