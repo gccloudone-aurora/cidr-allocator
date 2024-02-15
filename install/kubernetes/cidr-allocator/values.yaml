@@ -1,0 +1,206 @@
+# -- specifies whether or not to enable leader-election for the podtracker controller
+leaderElectionEnabled: true
+
+# -- number of replicas to create for the controller
+replicaCount: 2
+
+image:
+  # -- the source image repository
+  repository: statcan/cidr-allocator
+  # -- the image pull policy
+  # -- can be one of "Always", "IfNotPresent", "Never"
+  pullPolicy: IfNotPresent
+  # -- Overrides the image tag whose default is the chart appVersion.
+  # tag: "v1.0.0"
+
+# -- specifies credentials for a private registry to pull source image
+imagePullSecrets: []
+  # - name: image-pull-secret-name
+
+# -- override name
+nameOverride: ""
+# -- override full name
+fullnameOverride: ""
+
+serviceAccount:
+  # -- Specifies whether a service account should be created
+  create: true
+  # -- Annotations to add to the service account
+  annotations: {}
+  # -- The name of the service account to use.
+  # -- If not set and create is true, a name is generated using the fullname template
+  name: ""
+
+## PriorityClassName indicates the Pod priority and hence importance of a Pod relative to other Pods.
+priorityClassName: ""
+
+podSecurityContext: {}
+  # fsGroup: 2000
+
+# -- the pod security context which defines privilege and access control settings for the controller Pod
+securityContext:
+  runAsNonRoot: true
+  # capabilities:
+  #   drop:
+  #   - ALL
+  # readOnlyRootFilesystem: true
+  # runAsUser: 1000
+
+podLabels: {}
+podAnnotations: {}
+
+rbac:
+  # -- Specifies whether RBAC resources should be created (recommended)
+  create: true
+
+# -- resource limits/requests for created resources
+resources: {}
+  # limits:
+  #   cpu: 400m
+  #   memory: 500Mi
+  # requests:
+  #   cpu: 100m
+  #   memory: 100Mi
+
+# -- any additional environment vars to pass to container (manager)
+envVars: []
+
+prometheus:
+  # -- Enable Prometheus monitoring for the podtracker controller to use with the
+  # -- Prometheus Operator. Either `prometheus.servicemonitor.enabled` or
+  # -- `prometheus.podmonitor.enabled` can be used to create a ServiceMonitor/PodMonitor
+  # -- resource.
+  enabled: true
+  servicemonitor:
+    # -- Create a ServiceMonitor to add podtracker to Prometheus.
+    enabled: true
+
+    # -- Specifies the `prometheus` label on the created ServiceMonitor. This is
+    # -- used when different Prometheus instances have label selectors matching
+    # -- different ServiceMonitors.
+    prometheusInstance: default
+
+    # -- The target port to set on the ServiceMonitor. This must match the port that the
+    # -- podtracker controller is listening on for metrics.
+    targetPort: 9003
+
+    # -- The path to scrape for metrics.
+    path: /metrics
+
+    # -- The interval to scrape metrics.
+    interval: 60s
+
+    # -- The timeout before a metrics scrape fails.
+    scrapeTimeout: 30s
+
+    # -- Additional labels to add to the ServiceMonitor.
+    labels: {}
+
+    # -- Additional annotations to add to the ServiceMonitor.
+    annotations: {}
+
+    # -- Keep labels from scraped data, overriding server-side labels.
+    honorLabels: false
+
+    # -- EndpointAdditionalProperties allows setting additional properties on the
+    # -- endpoint such as relabelings, metricRelabelings etc.
+    #
+    # For example:
+    #  endpointAdditionalProperties:
+    #   relabelings:
+    #   - action: replace
+    #     sourceLabels:
+    #     - __meta_kubernetes_pod_node_name
+    #     targetLabel: instance
+    #
+    # +docs:property
+    endpointAdditionalProperties: {}
+
+  # Note that you can not enable both PodMonitor and ServiceMonitor as they are mutually exclusive. Enabling both will result in a error.
+  podmonitor:
+    # -- Create a PodMonitor to add podtracker to Prometheus.
+    enabled: false
+
+    # -- Specifies the `prometheus` label on the created PodMonitor. This is
+    # -- used when different Prometheus instances have label selectors matching
+    # -- different PodMonitors.
+    prometheusInstance: default
+
+    # -- The path to scrape for metrics.
+    path: /metrics
+
+    # -- The interval to scrape metrics.
+    interval: 60s
+
+    # -- The timeout before a metrics scrape fails.
+    scrapeTimeout: 30s
+
+    # -- Additional labels to add to the PodMonitor.
+    labels: {}
+
+    # -- Additional annotations to add to the PodMonitor.
+    annotations: {}
+
+    # -- Keep labels from scraped data, overriding server-side labels.
+    honorLabels: false
+
+    # -- EndpointAdditionalProperties allows setting additional properties on the
+    # -- endpoint such as relabelings, metricRelabelings etc.
+    #
+    # For example:
+    #  endpointAdditionalProperties:
+    #   relabelings:
+    #   - action: replace
+    #     sourceLabels:
+    #     - __meta_kubernetes_pod_node_name
+    #     targetLabel: instance
+    #
+    # +docs:property
+    endpointAdditionalProperties: {}
+
+# -- specifies a selector for determining where the controller pods will be scheduled
+nodeSelector: {}
+  # kubernetes.io/os: linux
+
+# -- specifies which taints can be tolerated by the controller
+tolerations:
+  - operator: Exists
+#  - key: CriticalAddonsOnly
+#    operator: Exists
+#  - key: node.cloudprovider.kubernetes.io/shutdown
+#    operator: Exists
+#  - key: node.kubernetes.io/not-ready
+#    operator: Exists
+#  - key: node.kubernetes.io/unschedulable
+#    operator: Exists
+#  - key: node.kubernetes.io/network-unavailable
+#    operator: Exists
+
+# -- specifies pod affinities and anti-affinities to apply when scheduling controller pods
+affinity: {}
+  # nodeAffinity:
+  #   requiredDuringSchedulingIgnoredDuringExecution:
+  #     nodeSelectorTerms:
+  #       - matchFields:
+  #           - key: metadata.name
+  #             operator: In
+  #             values:
+  #               - .....
+
+# -- specifies how pods should be scheduled across multiple nodes
+topologySpreadConstraints:
+  - maxSkew: 1
+    topologyKey: kubernetes.io/hostname
+    whenUnsatisfiable: DoNotSchedule
+    labelSelector:
+      matchLabels:
+        app.kubernetes.io/name: cidr-allocator
+    nodeAffinityPolicy: Honor
+    nodeTaintsPolicy: Honor
+
+
+nodeCIDRAllocations: []
+  # - - name: bgp-peering-policy
+  #     nodeSelector:
+  #       kubernetes.io/os: "linux"
+  #     addressPools: []

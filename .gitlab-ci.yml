@@ -1,21 +1,31 @@
-include:
-  - project: cloudnative/gitlab/gitlabci/kaniko-image-ci
-    ref: v1.X
-    file: .kaniko.gitlab-ci.yml
+stages:
+  - image
+  - helm
 
 variables:
-  IMAGE_REPOSITORY: artifactory.cloud.statcan.ca/cwmd-cns-docker-local/cidr-allocator
-  KANIKO_OPTIONS: "--build-arg IMAGE_REPOSITORY=artifactory.cloud.statcan.ca/docker"
+  # kaniko options
   DOCKERFILE: "./Dockerfile"
   DOCKLE_OPTIONS: "--ignore CIS-DI-0001"
   HADOLINT_IGNORE: "--ignore DL3018 --ignore DL3026"
+  # helm-chart options
+  CHART_DIRS: install/kubernetes
 
-stages:
-  - version
-  - build
-  - scan
-  - push
-  - tag
+kaniko:
+  stage: image
+  needs: []
+  trigger:
+    include:
+      - project: cloudnative/gitlab/gitlabci/kaniko-image-ci
+        ref: v1.X
+        file: .kaniko.gitlab-ci.yml
+    strategy: depend
 
-trivy:
-  allow_failure: true
+helm:
+  stage: helm
+  needs: []
+  trigger:
+    include:
+      - project: cloudnative/gitlab/gitlabci/helm-chart
+        ref: v3.x
+        file: .helm.gitlab-ci.yml
+    strategy: depend

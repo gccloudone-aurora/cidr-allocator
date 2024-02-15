@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v1.0.0] - 2024-02-13
+### Breaking Change
+- feat(v1.0.0): initial release created and all previous versions migrated to Kubebuilder GO/v4
+- update(webhooks): removed default and validating webhooks
+  - webhooks were removed since the use-case for this operator primarily requires configuration prior to networking being available. As a result, there was little benefit added with the pre-existing webhooks implementation and it created a lot of additional complexity
+- feat(helm): added helm chart to source repository
+
 ## [v0.4.4] - 2023-12-21
 ### Changed
 - refactor(main): leader-election ID (name) made to be more descriptive and align with best practices

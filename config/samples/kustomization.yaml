@@ -1,0 +1,4 @@
+## Append samples of your project ##
+resources:
+- networking.statcan.gc.ca_v1alpha1_nodecidrallocation.yaml
+#+kubebuilder:scaffold:manifestskustomizesamples

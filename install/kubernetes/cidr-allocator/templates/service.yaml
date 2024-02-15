@@ -1,0 +1,21 @@
+{{- if and .Values.prometheus.enabled .Values.prometheus.servicemonitor.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "cidr-allocator.fullname" . }}
+{{- with .Values.serviceAnnotations }}
+  annotations:
+{{ toYaml . | indent 4 }}
+{{- end }}
+  labels:
+    {{- include "cidr-allocator.labels" . | nindent 4 }}
+spec:
+  type: ClusterIP
+  ports:
+  - protocol: TCP
+    port: 9003
+    name: metrics
+    targetPort: {{ .Values.prometheus.servicemonitor.targetPort }}
+  selector:
+    {{ include "cidr-allocator.selectorLabels" . | nindent 4 }}
+{{- end }}

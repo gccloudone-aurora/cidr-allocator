@@ -1,7 +1,7 @@
 /*
 MIT License
 
-Copyright (c) His Majesty the King in Right of Canada, as represented by the Minister responsible for Statistics Canada, 2023
+Copyright (c) His Majesty the King in Right of Canada, as represented by the Minister responsible for Statistics Canada, 2024
 
 Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"),
 to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,
@@ -14,14 +14,14 @@ FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTH
 WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-package controllers_test
+package helper_test
 
 import (
 	"testing"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"statcan.gc.ca/cidr-allocator/controllers"
+	"statcan.gc.ca/cidr-allocator/internal/helper"
 )
 
 func TestObjectContainsLabel(t *testing.T) {
@@ -41,7 +41,7 @@ func TestObjectContainsLabel(t *testing.T) {
 		"kubernetes.io/role": "agent",
 	}
 
-	got := controllers.ObjectContainsLabels(obj, nodeSelectorLabels)
+	got := helper.ObjectContainsLabels(obj, nodeSelectorLabels)
 	want := true
 
 	if got != want {
@@ -53,7 +53,7 @@ func TestObjectContainsLabel(t *testing.T) {
 		"kubernetes.io/role": "agent",
 		"kubernetes.io/bad":  "abc",
 	}
-	got = controllers.ObjectContainsLabels(obj, nodeSelectorLabels)
+	got = helper.ObjectContainsLabels(obj, nodeSelectorLabels)
 	want = false
 
 	if got != want {
@@ -65,7 +65,7 @@ func TestObjectContainsLabel(t *testing.T) {
 		"kubernetes.io/role": "agent",
 		"kubernetes.io/os":   "windows",
 	}
-	got = controllers.ObjectContainsLabels(obj, nodeSelectorLabels)
+	got = helper.ObjectContainsLabels(obj, nodeSelectorLabels)
 	want = false
 
 	if got != want {
@@ -77,7 +77,7 @@ func TestObjectContainsLabel(t *testing.T) {
 		"kubernetes.io/role": "agent",
 		"kubernetes.io/os":   "linux",
 	}
-	got = controllers.ObjectContainsLabels(obj, nodeSelectorLabels)
+	got = helper.ObjectContainsLabels(obj, nodeSelectorLabels)
 	want = true
 
 	if got != want {
@@ -90,7 +90,7 @@ func TestStringInSlice(t *testing.T) {
 	sl := []string{"happy", "birthday", "to", "you!"}
 
 	// Case 1: The string does exist in the string slice
-	got := controllers.StringInSlice(s, sl)
+	got := helper.StringInSlice(s, sl)
 	want := true
 
 	if got != want {
@@ -99,7 +99,7 @@ func TestStringInSlice(t *testing.T) {
 
 	// Case 2: The string does NOT exist in the string slice
 	s = "Shenanigans"
-	got = controllers.StringInSlice(s, sl)
+	got = helper.StringInSlice(s, sl)
 	want = false
 
 	if got != want {

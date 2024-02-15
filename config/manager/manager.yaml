@@ -70,13 +70,13 @@ spec:
         - /manager
         args:
         - --leader-elect
-        image: controller:latest
+        image: nodecidrallocation:latest
         name: manager
         securityContext:
           allowPrivilegeEscalation: false
           capabilities:
             drop:
-              - "ALL"
+            - "ALL"
         livenessProbe:
           httpGet:
             path: /healthz

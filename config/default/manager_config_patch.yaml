@@ -8,3 +8,9 @@ spec:
     spec:
       containers:
       - name: manager
+        command:
+        - /nodecidrallocator
+        args:
+        - --leader-elect
+        - --disable-webhooks
+        imagePullPolicy: Never

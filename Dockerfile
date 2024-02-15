@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# Copyright (c) His Majesty the King in Right of Canada, as represented by the Minister responsible for Statistics Canada, 2023
+# Copyright (c) His Majesty the King in Right of Canada, as represented by the Minister responsible for Statistics Canada, 2024
 
 # Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"),
 # to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,
@@ -13,9 +13,11 @@
 # FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
 # WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-ARG IMAGE_REPOSITORY
+ARG IMAGE_REPOSITORY=docker.io/docker
+ARG TARGETARCH
+ARG TARGETOS=linux
 
-FROM ${IMAGE_REPOSITORY}/golang:1.20 as builder
+FROM ${IMAGE_REPOSITORY}/golang:1.22 as builder
 ARG TARGETOS
 ARG TARGETARCH
 
@@ -26,13 +28,12 @@ COPY go.sum go.sum
 RUN go mod download
 
 # Copy the go source
-COPY main.go main.go
 COPY api/ api/
-COPY pkg/ pkg/
-COPY controllers/ controllers/
+COPY internal/ internal/
+COPY cmd/main.go cmd/main.go
 
 # Build
-RUN CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH} go build -a -o nodecidrallocator main.go
+RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -a -o nodecidrallocator cmd/main.go
 
 # Using scratch base to host binary with minimal impact/attach surface area
 FROM scratch

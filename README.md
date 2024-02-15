@@ -10,7 +10,7 @@ This project follows the [`Kubernetes Operator Pattern`](https://kubernetes.io/d
 
 ### Architecture
 
-![CIDR-Allocator Solution Architecture](./docs/media/cidr_allocator_solution_architecture.svg)
+![CIDR-Allocator Solution Architecture](/docs/media/cidr_allocator_solution_architecture.svg)
 
 
 The controller watches for a [`NodeCIDRAllocation`](./api/v1alpha1/nodecidrallocation_types.go) custom resource (CR) that will identify blocks of IPv4 addresses that will be used during the allocation of a `PodCIDR` range to a Node. A `NodeSelector` is used to identify which `Node` resources should align with each `NodeCIDRAllocation` that is defined. This gives us the flexibility to manage Pod IP allocation with as much or as little granularity as desired.

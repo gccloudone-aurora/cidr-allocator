@@ -1,7 +1,7 @@
 /*
 MIT License
 
-Copyright (c) His Majesty the King in Right of Canada, as represented by the Minister responsible for Statistics Canada, 2023
+Copyright (c) His Majesty the King in Right of Canada, as represented by the Minister responsible for Statistics Canada, 2024
 
 Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"),
 to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,
@@ -24,8 +24,8 @@ import (
 	corev1 "k8s.io/api/core/v1"
 
 	"statcan.gc.ca/cidr-allocator/api/v1alpha1"
-	pkg_net "statcan.gc.ca/cidr-allocator/pkg/networking"
-	"statcan.gc.ca/cidr-allocator/pkg/util"
+	"statcan.gc.ca/cidr-allocator/internal/helper"
+	statcan_net "statcan.gc.ca/cidr-allocator/internal/networking"
 )
 
 var (
@@ -81,13 +81,13 @@ func AvailableHostsPercent() prometheus.Gauge {
 func Update(nodeCIDRAllocations *v1alpha1.NodeCIDRAllocationList, allNodes *corev1.NodeList) {
 	var notAllocated uint64
 	nodeAllocationsCumulative := map[string]struct{}{}
-	addressPoolsCumulative := map[string]struct{}{} // like util.ObjectContainsLabel(...), we are using a map-like DS to avoid duplicates
+	addressPoolsCumulative := map[string]struct{}{} // like helper.ObjectContainsLabel(...), we are using a map-like DS to avoid duplicates
 	for _, n := range nodeCIDRAllocations.Items {
 		for _, p := range n.Spec.AddressPools {
 			addressPoolsCumulative[p] = struct{}{}
 		}
 	}
-	totalAvailableHosts := accumulatedHosts(util.Keys(addressPoolsCumulative))
+	totalAvailableHosts := accumulatedHosts(helper.Keys(addressPoolsCumulative))
 
 	for _, n := range allNodes.Items {
 		if n.Spec.PodCIDR == "" {
@@ -96,7 +96,7 @@ func Update(nodeCIDRAllocations *v1alpha1.NodeCIDRAllocationList, allNodes *core
 		}
 		nodeAllocationsCumulative[n.Spec.PodCIDR] = struct{}{}
 	}
-	totalAllocatedHosts := accumulatedHosts(util.Keys(nodeAllocationsCumulative))
+	totalAllocatedHosts := accumulatedHosts(helper.Keys(nodeAllocationsCumulative))
 
 	metricsExpectedAllocations.Set(float64(len(allNodes.Items)))
 	metricsActualAllocations.Set(float64(len(allNodes.Items) - int(notAllocated)))
@@ -115,7 +115,7 @@ func accumulatedHosts(networkCIDRs []string) uint32 {
 			continue
 		}
 		networkOnes, _ := ipNet.Mask.Size()
-		networkSize, err := pkg_net.NumHostsForMask(uint8(networkOnes))
+		networkSize, err := statcan_net.NumHostsForMask(uint8(networkOnes))
 		if err != nil {
 			continue
 		}
