@@ -29,12 +29,10 @@ import (
 func TestSmallestMaskForNumHosts(t *testing.T) {
 	// Case 1: Standard 254 required hosts
 	// expected: should return 24 since 254+2(reserved) = 256 = 2^8 => 32-8 = 24
-	got, err := networking.SmallestMaskForNumHosts(254)
+	got := networking.SmallestMaskForNumHosts(254)
 	var want uint8 = 24
 
-	if err != nil {
-		t.Errorf("function was not expected to error. got %e", err)
-	} else if got != want {
+	if got != want {
 		t.Errorf("got %d, wanted %d", got, want)
 	}
 }

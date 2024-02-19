@@ -10,9 +10,9 @@ keywords:
   - Networking
   - Node
 
-version: 2.0.0
+version: 2.0.1
 kubeVersion: ">= 1.16.0-0"
-appVersion: "v1.0.0"
+appVersion: "v1.0.1"
 
 maintainers:
   - name: Ben Sykes

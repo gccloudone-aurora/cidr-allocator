@@ -22,9 +22,9 @@ The controller watches for a [`NodeCIDRAllocation`](./api/v1alpha1/nodecidralloc
 Install `CIDR-Allocator` from the official StatCan Helm Chart
 
 ```bash
-helm repo add statcan https://statcan.github.io/charts
+helm repo add statcan-ca https://statcan.github.io/cidr-allocator
 helm repo update
-helm install my-cidr-allocator statcan/cidr-allocator
+helm install cidr-allocator statcan-ca/cidr-allocator
 ```
 
 > For an example configuration for the `NodeCIDRAllocation` CR, please take a look at [config/samples](/config/samples/)
