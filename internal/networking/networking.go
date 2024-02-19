@@ -27,14 +27,8 @@ import (
 
 // SmallestMaskForNumHosts calculates the smallest number of network bits required to
 // satisfy the required number of hosts supplied
-// this will never result in a value less than 0
-func SmallestMaskForNumHosts(requiredHosts uint32) (uint8, error) {
-	res := 32 - int(math.Ceil(math.Log2(float64(requiredHosts+2))))
-	if res < 0 {
-		return 0, fmt.Errorf("resulting CIDR for %d required hosts specified is invalid. result was %d", requiredHosts, res)
-	}
-
-	return uint8(res), nil
+func SmallestMaskForNumHosts(requiredHosts uint32) uint8 {
+	return uint8(32 - int(math.Ceil(math.Log2(float64(requiredHosts+2)))))
 }
 
 // NumHostsForMask will calculate the total number of addresses provided a number of 1s (network mask) from a network address
