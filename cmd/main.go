@@ -63,8 +63,8 @@ var (
 	probeAddr string
 	// enableLeaderElection specifies whether or not leader election should be used for the controller manager
 	enableLeaderElection bool
-	// developmentLogging specifies whether to enable Development (Debug) logging for ZAP. Otherwise, Zap Production logging will be used
-	developmentLogging bool
+	// debugLogging specifies whether to enable Development (Debug) logging for ZAP. Otherwise, Zap Production logging will be used
+	debugLogging bool
 	// secureMetrics specifies whether the metrics endpoint is served over https
 	secureMetrics bool
 	// enableHTTP2 specifies that HTTP/2 will be enabled for the metrics and webhook servers (if exists)
@@ -98,8 +98,8 @@ func init() {
 		"Enable leader election for controller manager. Enabling this will ensure there is only one active controller manager.",
 	)
 	flag.BoolVar(
-		&developmentLogging,
-		"dev-logging",
+		&debugLogging,
+		"debug",
 		false,
 		"Enable development logging",
 	)
@@ -117,7 +117,7 @@ func init() {
 	)
 
 	opts := zap.Options{
-		Development: developmentLogging,
+		Development: debugLogging,
 	}
 	opts.BindFlags(flag.CommandLine)
 	flag.Parse()

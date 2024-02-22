@@ -19,6 +19,7 @@ package helper_test
 import (
 	"testing"
 
+	"golang.org/x/exp/slices"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"statcan.gc.ca/cidr-allocator/internal/helper"
@@ -104,5 +105,33 @@ func TestStringInSlice(t *testing.T) {
 
 	if got != want {
 		t.Errorf("got %t, wanted %t", got, want)
+	}
+}
+
+func TestKeys(t *testing.T) {
+	m := make(map[uint8]struct{}, 3)
+	m[1] = struct{}{}
+	m[2] = struct{}{}
+	m[3] = struct{}{}
+
+	got := helper.Keys(m)
+	want := []uint8{1, 2, 3}
+
+	slices.Sort(got)
+
+	if len(got) != len(want) {
+		t.Errorf("got %d, wanted %d", got, want)
+	}
+
+	if got[0] != want[0] {
+		t.Errorf("got %d, wanted %d", got, want)
+	}
+
+	if got[1] != want[1] {
+		t.Errorf("got %d, wanted %d", got, want)
+	}
+
+	if got[2] != want[2] {
+		t.Errorf("got %d, wanted %d", got, want)
 	}
 }

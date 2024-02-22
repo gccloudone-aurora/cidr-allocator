@@ -13,4 +13,5 @@ spec:
         args:
         - --leader-elect
         - --disable-webhooks
+        - --debug
         imagePullPolicy: Never

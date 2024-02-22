@@ -26,6 +26,6 @@ helm:
   trigger:
     include:
       - project: cloudnative/gitlab/gitlabci/helm-chart
-        ref: v3.x
+        ref: v4.x
         file: .helm.gitlab-ci.yml
     strategy: depend

@@ -91,7 +91,7 @@ func Update(nodeCIDRAllocations *v1alpha1.NodeCIDRAllocationList, allNodes *core
 
 	for _, n := range allNodes.Items {
 		if n.Spec.PodCIDR == "" {
-			notAllocated += 1
+			notAllocated++
 			continue
 		}
 		nodeAllocationsCumulative[n.Spec.PodCIDR] = struct{}{}
@@ -146,11 +146,11 @@ func GetMetricValue(col prometheus.Collector) float64 {
 	}
 
 	if _, ok := col.(prometheus.Gauge); ok {
-		return *m.Gauge.Value
+		return m.GetGauge().GetValue()
 	}
 
 	if _, ok := col.(prometheus.Counter); ok {
-		return *m.Counter.Value
+		return m.GetCounter().GetValue()
 	}
 
 	return -1
