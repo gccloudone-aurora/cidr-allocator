@@ -25,17 +25,21 @@ import (
 	corev1 "k8s.io/api/core/v1"
 )
 
+const (
+	IPV4_MAX_BITS = 32
+)
+
 // SmallestMaskForNumHosts calculates the smallest number of network bits required to
 // satisfy the required number of hosts supplied
 func SmallestMaskForNumHosts(requiredHosts uint32) uint8 {
-	return uint8(32 - int(math.Ceil(math.Log2(float64(requiredHosts+2)))))
+	return uint8(IPV4_MAX_BITS - int(math.Ceil(math.Log2(float64(requiredHosts+2)))))
 }
 
 // NumHostsForMask will calculate the total number of addresses provided a number of 1s (network mask) from a network address
 // ones is the total number of network assigned bits in the network mask
 func NumHostsForMask(ones uint8) (uint32, error) {
-	m := uint8(32)
-	if ones > 32 || ones < 1 {
+	m := uint8(IPV4_MAX_BITS)
+	if ones > IPV4_MAX_BITS || ones < 1 {
 		return 0, fmt.Errorf("invalid desired network bits (ones) specified. %d. must be 1 <= ones <= 32", ones)
 	}
 
@@ -67,9 +71,9 @@ func SubnetsFromPool(pool string, ones uint8) ([]string, error) {
 		if err != nil {
 			return []string{}, err
 		}
-		offset := i * uint32(netSize)
+		offset := i * netSize
 
-		nextSub := iplib.IncrementIP4By(poolNet.IP, uint32(offset))
+		nextSub := iplib.IncrementIP4By(poolNet.IP, offset)
 		subnets[i] = fmt.Sprintf("%s/%d", nextSub, ones)
 	}
 

@@ -30,7 +30,7 @@ import (
 func TestGet(t *testing.T) {
 	got := metrics.Get()
 
-	if len(got) <= 0 {
+	if len(got) == 0 {
 		t.Errorf("did not get any metrics collectors (length: %d)", len(got))
 	}
 }
@@ -157,19 +157,19 @@ func TestUpdate(t *testing.T) {
 
 func TestGetMetricValue(t *testing.T) {
 	m1 := prometheus.NewGauge(prometheus.GaugeOpts{
-		Name: "testGaugeA",
+		Name: "test_gauge_a",
 	})
 	m2 := prometheus.NewCounter(prometheus.CounterOpts{
-		Name: "testCounterA",
+		Name: "test_counter_a_total",
 	})
 	m3 := prometheus.NewHistogram(prometheus.HistogramOpts{
-		Name: "testHistA",
+		Name: "test_hist_a",
 	})
 
 	// Case 1: Metric is a Gauge
 	// expected: the metrics value for the gauge metric m1
 	m1.Set(10)
-	var got float64 = metrics.GetMetricValue(m1)
+	var got = metrics.GetMetricValue(m1)
 	var want float64 = 10
 
 	if got != want {

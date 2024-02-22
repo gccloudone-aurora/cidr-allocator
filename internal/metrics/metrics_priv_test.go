@@ -23,7 +23,7 @@ func TestAccumulatedHosts(t *testing.T) {
 
 	// Case 1: Valid CIDRs are provided and specify /26 and /27 as CIDR block size
 	// expected: 64 + 32 = 96
-	var got uint32 = accumulatedHosts(cidrs)
+	var got = accumulatedHosts(cidrs)
 	var want uint32 = 96
 
 	if got != want {

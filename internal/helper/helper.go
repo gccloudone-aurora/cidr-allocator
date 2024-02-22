@@ -56,13 +56,3 @@ func Keys[K, V comparable](m map[K]V) []K {
 
 	return keys
 }
-
-// RemoveByVal rebuilds the supplied list of items with the specified item removed
-func RemoveByVal[T comparable](l []T, item T) []T {
-	for i, other := range l {
-		if other == item {
-			return append(l[:i], l[i+1:]...)
-		}
-	}
-	return l
-}

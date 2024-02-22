@@ -18,6 +18,7 @@ package controller
 
 import (
 	"context"
+	"errors"
 
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -28,6 +29,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/metrics"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
@@ -198,10 +200,9 @@ func (r *NodeCIDRAllocationReconciler) Reconcile(ctx context.Context, req ctrl.R
 		return ctrl.Result{}, err
 	}
 
-	rl.Info(
-		"reconciling matching Nodes with NodeCIDRAllocation ...",
-		"nodeCIDRAllocation", nodeCIDRAllocation.GetName(),
-	)
+	//
+	// Begin allocation process
+	//
 
 	freeSubnets := make(map[uint8][]string)
 	for _, node := range matchingNodes.Items {
@@ -323,6 +324,9 @@ func (r *NodeCIDRAllocationReconciler) finalizeReconcile(ctx context.Context, no
 	r.updateNodeCIDRAllocationStatus(ctx, nodeCIDRAllocation, nodes, err)
 	r.updatePrometheusMetrics(ctx)
 
+	// remove or add Node taints according to allocation status of each matching node
+	err = errors.Join(err, r.updateNodeTaints(ctx, nodes))
+
 	// passthrough for err (if non-nil) to the Reconcile Result
 	return err
 }
@@ -384,6 +388,24 @@ func (r *NodeCIDRAllocationReconciler) updateNodeCIDRAllocationStatus(ctx contex
 	}
 }
 
+func (r *NodeCIDRAllocationReconciler) updateNodeTaints(ctx context.Context, nodes *corev1.NodeList) error {
+	ntc := &NodeTaintClient{}
+	for _, n := range nodes.Items {
+		ntc.Handle(&n)
+		if err := r.Client.Update(ctx, &n); err != nil {
+			if apierrors.IsNotFound(err) {
+				// node was removed after reconcile request was created - skip the Node
+				continue
+			}
+
+			// error trying to add the Node taint to the Node object
+			return err
+		}
+	}
+
+	return nil
+}
+
 // triggerNodeCIDRAllocationReconcileFromNodeChange is a mapping function which takes a Node object
 // and returns a list of reconciliation requests for all NodeCIDRAllocation resources that have a matching NodeSelector
 func (r *NodeCIDRAllocationReconciler) triggerNodeCIDRAllocationReconcileFromNodeChange(ctx context.Context, o client.Object) []reconcile.Request {
@@ -429,9 +451,12 @@ func (r *NodeCIDRAllocationReconciler) SetupWithManager(mgr ctrl.Manager) error 
 		Watches(
 			&corev1.Node{},
 			handler.EnqueueRequestsFromMapFunc(r.triggerNodeCIDRAllocationReconcileFromNodeChange),
-			builder.WithPredicates(predicate.Or(
-				predicate.LabelChangedPredicate{},
-			)),
+			builder.WithPredicates(predicate.Funcs{
+				CreateFunc:  func(_ event.CreateEvent) bool { return true },
+				UpdateFunc:  func(_ event.UpdateEvent) bool { return false },
+				DeleteFunc:  func(_ event.DeleteEvent) bool { return false },
+				GenericFunc: func(_ event.GenericEvent) bool { return false },
+			}),
 		).
 		Complete(r)
 }
