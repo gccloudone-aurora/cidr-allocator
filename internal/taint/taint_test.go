@@ -23,47 +23,75 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
 
-package controller_test
+package taint_test
 
 import (
 	"testing"
 
 	corev1 "k8s.io/api/core/v1"
-	"statcan.gc.ca/cidr-allocator/internal/controller"
+	"statcan.gc.ca/cidr-allocator/internal/taint"
 )
 
-func TestNodeTaintClientHandleNoPodCIDR(t *testing.T) {
+const nodeTaintKey = "abc"
+
+func TestNodeTaintClientHasTaint(t *testing.T) {
 	node := &corev1.Node{
 		Spec: corev1.NodeSpec{
-			PodCIDR: "",
+			Taints: []corev1.Taint{
+				{
+					Key: nodeTaintKey,
+				},
+			},
 		},
 	}
 
-	ntc := &controller.NodeTaintClient{}
-	ntc.Handle(node)
+	ntc := taint.New()
 
-	want := 1
-	got := len(node.Spec.Taints)
+	want := true
+	got := ntc.HasTaint(node, nodeTaintKey)
 
 	if got != want {
-		t.Errorf("got %d, wanted %d", got, want)
+		t.Errorf("got %t, wanted %t", got, want)
+	}
+
+	want = false
+	got = ntc.HasTaint(node, "xyz")
+
+	if got != want {
+		t.Errorf("got %t, wanted %t", got, want)
 	}
 }
 
-func TestNodeTaintClientHandlePodCIDRAssigned(t *testing.T) {
+func TestNodeTaintClientAddNodeTaint(t *testing.T) {
+	node := &corev1.Node{
+		Spec: corev1.NodeSpec{},
+	}
+
+	ntc := taint.New()
+	ntc.AddNodeTaint(node, corev1.Taint{Key: nodeTaintKey, Value: "true"})
+
+	want := true
+	got := len(node.Spec.Taints) == 1 && node.Spec.Taints[0].Key == nodeTaintKey
+
+	if got != want {
+		t.Errorf("got %v, wanted %v", node.Spec.Taints, []corev1.Taint{{Key: nodeTaintKey, Value: "true"}})
+	}
+}
+
+func TestNodeTaintClientRemoveNodeTaint(t *testing.T) {
 	node := &corev1.Node{
 		Spec: corev1.NodeSpec{
-			PodCIDR: "10.0.0.0/24",
+			Taints: []corev1.Taint{{Key: nodeTaintKey}},
 		},
 	}
 
-	ntc := &controller.NodeTaintClient{}
-	ntc.Handle(node)
+	ntc := taint.New()
+	ntc.RemoveNodeTaint(node, nodeTaintKey)
 
-	want := 0
-	got := len(node.Spec.Taints)
+	want := true
+	got := len(node.Spec.Taints) == 0
 
 	if got != want {
-		t.Errorf("got %d, wanted %d", got, want)
+		t.Errorf("got %v, wanted %v", node.Spec.Taints, []corev1.Taint{})
 	}
 }

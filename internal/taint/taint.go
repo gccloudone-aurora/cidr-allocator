@@ -23,44 +23,51 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
 
-package controller
+package taint
 
 import (
 	corev1 "k8s.io/api/core/v1"
 )
 
-const (
-	nodeTaintKey = "node.networking.statcan.gc.ca/network-unavailable"
-)
-
+// NodeTainter is an interface that describes how to handle Node taints
 type NodeTainter interface {
-	Handle(*corev1.Node)
+	AddNodeTaint(*corev1.Node, corev1.Taint)
+	RemoveNodeTaint(*corev1.Node, string)
+	HasTaint(*corev1.Node, string) bool
 }
 
+// NodeTaintClient provides a set of related functionality for managing Node taints for the CIDR-Allocator.
+//
+// This implementation is opinionated and designed for use with the CIDR-Allocator
 type NodeTaintClient struct{}
 
+// A blank assignment to ensure conformity to the NodeTainer interface
 var _ NodeTainter = &NodeTaintClient{}
 
-func (n *NodeTaintClient) Handle(node *corev1.Node) {
-	if node.Spec.PodCIDR == "" {
-		n.addNodeTaint(node)
-	} else {
-		n.removeNodeTaintIfExists(node)
+// New creates a new NodeTaintClient and provides a reference to it
+func New() *NodeTaintClient {
+	return &NodeTaintClient{}
+}
+
+// taintExists checks the existing taints on the provided Node for one that has the key provided. If one exists, it returns true
+func (n *NodeTaintClient) HasTaint(node *corev1.Node, key string) bool {
+	for _, t := range node.Spec.Taints {
+		if t.Key == key {
+			return true
+		}
 	}
+
+	return false
 }
 
-func (n *NodeTaintClient) addNodeTaint(node *corev1.Node) {
-	node.Spec.Taints = append(node.Spec.Taints, corev1.Taint{
-		Key:    nodeTaintKey,
-		Value:  "true",
-		Effect: corev1.TaintEffectNoSchedule,
-	})
+func (n *NodeTaintClient) AddNodeTaint(node *corev1.Node, taint corev1.Taint) {
+	node.Spec.Taints = append(node.Spec.Taints, taint)
 }
 
-func (n *NodeTaintClient) removeNodeTaintIfExists(node *corev1.Node) {
+func (n *NodeTaintClient) RemoveNodeTaint(node *corev1.Node, key string) {
 	taints := []corev1.Taint{}
 	for _, taint := range node.Spec.Taints {
-		if taint.Key != nodeTaintKey {
+		if taint.Key != key {
 			taints = append(taints, taint)
 		}
 	}

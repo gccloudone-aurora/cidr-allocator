@@ -42,10 +42,19 @@ import (
 	"statcan.gc.ca/cidr-allocator/internal/helper"
 	statcan_metrics "statcan.gc.ca/cidr-allocator/internal/metrics"
 	statcan_net "statcan.gc.ca/cidr-allocator/internal/networking"
+	"statcan.gc.ca/cidr-allocator/internal/taint"
 )
 
 const (
 	finalizerName = "nodecidrallocation.networking.statcan.gc.ca/finalizer"
+)
+
+var (
+	nodeTaint = corev1.Taint{
+		Key:    "node.networking.statcan.gc.ca/network-unavailable",
+		Value:  "true",
+		Effect: corev1.TaintEffectNoSchedule,
+	}
 )
 
 // NodeCIDRAllocationReconciler reconciles a NodeCIDRAllocation object
@@ -184,7 +193,9 @@ func (r *NodeCIDRAllocationReconciler) Reconcile(ctx context.Context, req ctrl.R
 
 	if len(matchingNodes.Items) == 0 {
 		rl.V(1).Info("no matching nodes exist. skipping")
-		return ctrl.Result{}, nil
+
+		// nodeCIDRAllocation does not have any matching nodes - return and do not requeue
+		return ctrl.Result{}, r.finalizeReconcile(ctx, &nodeCIDRAllocation, &matchingNodes, nil)
 	}
 
 	// retrieve a list of all Nodes in the cluster.
@@ -197,7 +208,7 @@ func (r *NodeCIDRAllocationReconciler) Reconcile(ctx context.Context, req ctrl.R
 		)
 
 		// could not list Nodes in the cluster - return and requeue
-		return ctrl.Result{}, err
+		return ctrl.Result{}, r.finalizeReconcile(ctx, &nodeCIDRAllocation, &matchingNodes, err)
 	}
 
 	//
@@ -265,7 +276,7 @@ func (r *NodeCIDRAllocationReconciler) Reconcile(ctx context.Context, req ctrl.R
 				&nodeCIDRAllocation,
 				corev1.EventTypeWarning,
 				EventReasonNoAddressSpace,
-				"There are no available subnets for the requested size (/%s). Could not assign PodCIDR to Node (%s)", requiredCIDRMask, node.GetName(),
+				"There are no available subnets for the requested size (/%d). Could not assign PodCIDR to Node (%s)", requiredCIDRMask, node.GetName(),
 			)
 
 			// no available subnet to assign to Node - return and do not requeue
@@ -389,10 +400,19 @@ func (r *NodeCIDRAllocationReconciler) updateNodeCIDRAllocationStatus(ctx contex
 }
 
 func (r *NodeCIDRAllocationReconciler) updateNodeTaints(ctx context.Context, nodes *corev1.NodeList) error {
-	ntc := &NodeTaintClient{}
-	for _, n := range nodes.Items {
-		ntc.Handle(&n)
-		if err := r.Client.Update(ctx, &n); err != nil {
+	ntc := taint.New()
+	for _, node := range nodes.Items {
+		// does not have an assigned PodCIDR - taint the Node
+		if node.Spec.PodCIDR == "" && !ntc.HasTaint(&node, nodeTaint.Key) {
+			ntc.AddNodeTaint(&node, nodeTaint)
+		}
+
+		// has a PodCIDR assigned - remove the taint from the Node
+		if node.Spec.PodCIDR != "" && ntc.HasTaint(&node, nodeTaint.Key) {
+			ntc.RemoveNodeTaint(&node, nodeTaint.Key)
+		}
+
+		if err := r.Client.Update(ctx, &node); err != nil {
 			if apierrors.IsNotFound(err) {
 				// node was removed after reconcile request was created - skip the Node
 				continue
@@ -413,7 +433,7 @@ func (r *NodeCIDRAllocationReconciler) triggerNodeCIDRAllocationReconcileFromNod
 	usedByNodeCIDRAllocation := map[*v1alpha1.NodeCIDRAllocation]struct{}{} // implements a set-like structure to ensure that we only process a single reconcile for each unique match
 
 	// get all the available NodeCIDRAllocations on the cluster
-	if err := r.Client.List(context.TODO(), allNodeCIDRAllocations, &client.ListOptions{
+	if err := r.Client.List(ctx, allNodeCIDRAllocations, &client.ListOptions{
 		Namespace: corev1.NamespaceAll,
 	}); err != nil {
 		return []reconcile.Request{}
@@ -454,7 +474,7 @@ func (r *NodeCIDRAllocationReconciler) SetupWithManager(mgr ctrl.Manager) error 
 			builder.WithPredicates(predicate.Funcs{
 				CreateFunc:  func(_ event.CreateEvent) bool { return true },
 				UpdateFunc:  func(_ event.UpdateEvent) bool { return false },
-				DeleteFunc:  func(_ event.DeleteEvent) bool { return false },
+				DeleteFunc:  func(_ event.DeleteEvent) bool { return true },
 				GenericFunc: func(_ event.GenericEvent) bool { return false },
 			}),
 		).
