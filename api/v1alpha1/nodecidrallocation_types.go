@@ -77,6 +77,7 @@ type NodeCIDRAllocationStatus struct {
 // This is a CRD that defines a NodeCIDRAllocation resource which allows for the allocation of PodCIDRs / Pod Subnets to Kubernetes Nodes
 // to be assigned to nodes in a cluster. This is implemented using a list of network CIDRs as blocks of available address space that can be allocated
 // to nodes using a node selector to filter the nodes upon which to apply the Pod CIDRs.
+//
 // +kubebuilder:printcolumn:name="Created",type="date",JSONPath=".metadata.creationTimestamp",description="NodeCIDRAllocation creation timestamp"
 // +kubebuilder:printcolumn:name="Pools",type="string",JSONPath=".spec.addressPools",description="NodeCIDRAllocation Address Pools"
 // +kubebuilder:printcolumn:name="NodeSelector",type="string",JSONPath=".spec.nodeSelector",description="NodeCIDRAllocation NodeSelector value"
