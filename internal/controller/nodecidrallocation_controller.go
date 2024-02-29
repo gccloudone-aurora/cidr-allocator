@@ -18,7 +18,6 @@ package controller
 
 import (
 	"context"
-	"errors"
 
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -42,19 +41,10 @@ import (
 	"statcan.gc.ca/cidr-allocator/internal/helper"
 	statcan_metrics "statcan.gc.ca/cidr-allocator/internal/metrics"
 	statcan_net "statcan.gc.ca/cidr-allocator/internal/networking"
-	"statcan.gc.ca/cidr-allocator/internal/taint"
 )
 
 const (
 	finalizerName = "nodecidrallocation.networking.statcan.gc.ca/finalizer"
-)
-
-var (
-	nodeTaint = corev1.Taint{
-		Key:    "node.networking.statcan.gc.ca/network-unavailable",
-		Value:  "true",
-		Effect: corev1.TaintEffectNoSchedule,
-	}
 )
 
 // NodeCIDRAllocationReconciler reconciles a NodeCIDRAllocation object
@@ -335,9 +325,6 @@ func (r *NodeCIDRAllocationReconciler) finalizeReconcile(ctx context.Context, no
 	r.updateNodeCIDRAllocationStatus(ctx, nodeCIDRAllocation, nodes, err)
 	r.updatePrometheusMetrics(ctx)
 
-	// remove or add Node taints according to allocation status of each matching node
-	err = errors.Join(err, r.updateNodeTaints(ctx, nodes))
-
 	// passthrough for err (if non-nil) to the Reconcile Result
 	return err
 }
@@ -397,33 +384,6 @@ func (r *NodeCIDRAllocationReconciler) updateNodeCIDRAllocationStatus(ctx contex
 			"unable to update resource status for NodeCIDRAllocation",
 		)
 	}
-}
-
-func (r *NodeCIDRAllocationReconciler) updateNodeTaints(ctx context.Context, nodes *corev1.NodeList) error {
-	ntc := taint.New()
-	for _, node := range nodes.Items {
-		// does not have an assigned PodCIDR - taint the Node
-		if node.Spec.PodCIDR == "" && !ntc.HasTaint(&node, nodeTaint.Key) {
-			ntc.AddNodeTaint(&node, nodeTaint)
-		}
-
-		// has a PodCIDR assigned - remove the taint from the Node
-		if node.Spec.PodCIDR != "" && ntc.HasTaint(&node, nodeTaint.Key) {
-			ntc.RemoveNodeTaint(&node, nodeTaint.Key)
-		}
-
-		if err := r.Client.Update(ctx, &node); err != nil {
-			if apierrors.IsNotFound(err) {
-				// node was removed after reconcile request was created - skip the Node
-				continue
-			}
-
-			// error trying to add the Node taint to the Node object
-			return err
-		}
-	}
-
-	return nil
 }
 
 // triggerNodeCIDRAllocationReconcileFromNodeChange is a mapping function which takes a Node object
