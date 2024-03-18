@@ -96,7 +96,11 @@ func (r *NodeCIDRAllocationReconciler) Reconcile(ctx context.Context, req ctrl.R
 	listOptions := client.ListOptions{
 		LabelSelector: client.MatchingLabelsSelector{Selector: labels.SelectorFromSet(nodeCIDRAllocation.Spec.NodeSelector)},
 	}
-	if err := r.Client.List(ctx, &matchingNodes, &listOptions, client.InNamespace(corev1.NamespaceAll)); err != nil {
+	fieldSelector := client.MatchingFields{
+		"spec.podCIDR": "", // select only matching Nodes that do not have a PodCIDR allocated
+	}
+
+	if err := r.Client.List(ctx, &matchingNodes, &listOptions, &fieldSelector); err != nil {
 		rl.Error(
 			err,
 			"unable to list Node resources from API server",
@@ -257,7 +261,7 @@ func (r *NodeCIDRAllocationReconciler) Reconcile(ctx context.Context, req ctrl.R
 		}
 
 		if len(freeSubnets[requiredCIDRMask]) == 0 {
-			rl.Info("unable to allocate podCIDR for node. no available address space. you may want to add some additional pools",
+			rl.Info("unable to allocate podCIDR for node. no sufficient address space capacity for Node",
 				"name", node.GetName(),
 				"requiredSubnetCIDR", requiredCIDRMask,
 			)
