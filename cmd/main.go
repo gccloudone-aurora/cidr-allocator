@@ -26,10 +26,12 @@ import (
 
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
 
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
@@ -187,8 +189,17 @@ func main() {
 		os.Exit(1)
 	}
 
+	managerContext := ctrl.SetupSignalHandler()
+
+	if err := mgr.GetFieldIndexer().IndexField(managerContext, &corev1.Node{}, "spec.podCIDR", func(o client.Object) []string {
+		node := o.(*corev1.Node)
+		return []string{node.Spec.PodCIDR}
+	}); err != nil {
+		setupLog.Error(err, "unable to setup field indexer for Node PodCIDRs")
+	}
+
 	setupLog.Info("starting manager")
-	if err := mgr.Start(ctrl.SetupSignalHandler()); err != nil {
+	if err := mgr.Start(managerContext); err != nil {
 		setupLog.Error(err, "problem running manager")
 		os.Exit(1)
 	}
