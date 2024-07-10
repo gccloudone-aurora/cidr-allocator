@@ -204,3 +204,4 @@ nodeCIDRAllocations: []
   #     nodeSelector:
   #       kubernetes.io/os: "linux"
   #     addressPools: []
+  #     staticAllocations: []

@@ -187,6 +187,7 @@ func TestNetworksOverlap(t *testing.T) {
 
 func TestNetworkAllocated(t *testing.T) {
 	subnets := []string{"10.0.0.0/26", "10.0.0.64/26", "10.0.0.128/26", "10.0.0.192/26"}
+
 	nodeList := corev1.NodeList{
 		TypeMeta: metav1.TypeMeta{},
 		ListMeta: metav1.ListMeta{},
@@ -204,7 +205,7 @@ func TestNetworkAllocated(t *testing.T) {
 
 	// Case 1: All nodes specified do not have a PodCIDR in their spec
 	// expected: false
-	got, err := networking.NetworkAllocated(subnets[0], &nodeList)
+	got, err := networking.NetworkAllocated(subnets[0], &nodeList, []string{})
 	want := false
 	if err != nil {
 		t.Errorf("function was not expected to error. got %e", err)
@@ -218,7 +219,7 @@ func TestNetworkAllocated(t *testing.T) {
 		TypeMeta: metav1.TypeMeta{},
 		ListMeta: metav1.ListMeta{},
 		Items:    []corev1.Node{},
-	})
+	}, []string{})
 	want = false
 	if err != nil {
 		t.Errorf("function was not expected to error. got %e", err)
@@ -244,7 +245,7 @@ func TestNetworkAllocated(t *testing.T) {
 				Status: corev1.NodeStatus{},
 			},
 		},
-	})
+	}, []string{})
 	if err == nil {
 		t.Error("function was expected to return with an error")
 	}
@@ -264,7 +265,7 @@ func TestNetworkAllocated(t *testing.T) {
 				Status: corev1.NodeStatus{},
 			},
 		},
-	})
+	}, []string{})
 	want = true
 	if err != nil {
 		t.Errorf("function was not expected to error. got %e", err)
@@ -287,7 +288,53 @@ func TestNetworkAllocated(t *testing.T) {
 				Status: corev1.NodeStatus{},
 			},
 		},
-	})
+	}, []string{})
+	want = false
+	if err != nil {
+		t.Errorf("function was not expected to error. got %e", err)
+	} else if got != want {
+		t.Errorf("got %t, wanted %t", got, want)
+	}
+
+	// Case 6: Provided subnet does not intersect with any Node, but intersects with an static allocation
+	// expected: true
+	got, err = networking.NetworkAllocated(subnets[0], &corev1.NodeList{
+		TypeMeta: metav1.TypeMeta{},
+		ListMeta: metav1.ListMeta{},
+		Items: []corev1.Node{
+			{
+				TypeMeta:   metav1.TypeMeta{},
+				ObjectMeta: metav1.ObjectMeta{},
+				Spec: corev1.NodeSpec{
+					PodCIDR: "10.0.0.64/28",
+				},
+				Status: corev1.NodeStatus{},
+			},
+		},
+	}, []string{"10.0.1.0/26", "10.0.0.8/30"})
+	want = true
+	if err != nil {
+		t.Errorf("function was not expected to error. got %e", err)
+	} else if got != want {
+		t.Errorf("got %t, wanted %t", got, want)
+	}
+
+	// Case 7: Provided subnet does not intersect with any Node and does not intersects with an static allocation
+	// expected: false
+	got, err = networking.NetworkAllocated(subnets[0], &corev1.NodeList{
+		TypeMeta: metav1.TypeMeta{},
+		ListMeta: metav1.ListMeta{},
+		Items: []corev1.Node{
+			{
+				TypeMeta:   metav1.TypeMeta{},
+				ObjectMeta: metav1.ObjectMeta{},
+				Spec: corev1.NodeSpec{
+					PodCIDR: "10.0.0.64/28",
+				},
+				Status: corev1.NodeStatus{},
+			},
+		},
+	}, []string{"10.0.1.0/26", "10.0.1.64/26"})
 	want = false
 	if err != nil {
 		t.Errorf("function was not expected to error. got %e", err)

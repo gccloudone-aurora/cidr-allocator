@@ -44,8 +44,9 @@ func TestUpdate(t *testing.T) {
 				TypeMeta:   metav1.TypeMeta{},
 				ObjectMeta: metav1.ObjectMeta{},
 				Spec: v1alpha1.NodeCIDRAllocationSpec{
-					AddressPools: []string{"10.0.0.0/24"},
-					NodeSelector: map[string]string{},
+					AddressPools:      []string{"10.0.0.0/24"},
+					StaticAllocations: []string{},
+					NodeSelector:      map[string]string{},
 				},
 				Status: v1alpha1.NodeCIDRAllocationStatus{},
 			},
@@ -124,9 +125,10 @@ func TestUpdate(t *testing.T) {
 		t.Errorf("got (%.0f, %.0f%%), wanted (%.0f, %.0f%%)", actualVal, actualValPercent, expectedVal, expectedVal)
 	}
 
-	// Case 2: Address pools of 10.0.0.0/24 for 4 nodes where 1 does not have a PodCIDR set
+	// Case 2: Address pools of 10.0.0.0/24 for 4 nodes where 1 does not have a PodCIDR set & there is staticAllocations
 	// expected: should result in expected allocations not equal to actual allocations
 	// and the difference being 1. Additionally, the available hosts should be 64 and as a percent should be 25.
+	allocations.Items[0].Spec.StaticAllocations = []string{"10.0.0.252/30", "10.0.0.248/30", "10.0.0.244/30", "10.0.0.240/30", "10.0.1.238/30"}
 	nodes.Items[0].Spec.PodCIDR = ""
 	metrics.Update(allocations, nodes)
 
@@ -143,8 +145,8 @@ func TestUpdate(t *testing.T) {
 
 	actualVal = metrics.GetMetricValue(metrics.AvailableHosts())
 	actualValPercent = metrics.GetMetricValue(metrics.AvailableHostsPercent())
-	expectedVal = 64
-	expectedValPercent := float64(25)
+	expectedVal = 48
+	expectedValPercent := float64(19.999999999999996)
 
 	if expectedVal != actualVal {
 		t.Errorf("got %.0f, wanted %.0f", actualVal, expectedVal)

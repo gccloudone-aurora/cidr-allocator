@@ -81,6 +81,7 @@ func AvailableHostsPercent() prometheus.Gauge {
 func Update(nodeCIDRAllocations *v1alpha1.NodeCIDRAllocationList, allNodes *corev1.NodeList) {
 	var notAllocated uint64
 	nodeAllocationsCumulative := map[string]struct{}{}
+	overlappingStaticAllocationsCumulative := map[string]struct{}{}
 	addressPoolsCumulative := map[string]struct{}{} // like helper.ObjectContainsLabel(...), we are using a map-like DS to avoid duplicates
 	for _, n := range nodeCIDRAllocations.Items {
 		for _, p := range n.Spec.AddressPools {
@@ -88,6 +89,19 @@ func Update(nodeCIDRAllocations *v1alpha1.NodeCIDRAllocationList, allNodes *core
 		}
 	}
 	totalAvailableHosts := accumulatedHosts(helper.Keys(addressPoolsCumulative))
+
+	for _, n := range nodeCIDRAllocations.Items {
+		for _, p := range n.Spec.StaticAllocations {
+			for _, a := range n.Spec.AddressPools {
+				networksOverlap, _ := statcan_net.NetworksOverlap(p, a)
+
+				if networksOverlap {
+					overlappingStaticAllocationsCumulative[p] = struct{}{}
+				}
+			}
+		}
+	}
+	totalOverlappingStaticAllocations := accumulatedHosts(helper.Keys(overlappingStaticAllocationsCumulative))
 
 	for _, n := range allNodes.Items {
 		if n.Spec.PodCIDR == "" {
@@ -101,7 +115,7 @@ func Update(nodeCIDRAllocations *v1alpha1.NodeCIDRAllocationList, allNodes *core
 	metricsExpectedAllocations.Set(float64(len(allNodes.Items)))
 	metricsActualAllocations.Set(float64(len(allNodes.Items) - int(notAllocated)))
 
-	remainingCount, remainingPercent := calculateRemainingHosts(totalAvailableHosts, totalAllocatedHosts)
+	remainingCount, remainingPercent := calculateRemainingHosts(totalAvailableHosts, totalAllocatedHosts, totalOverlappingStaticAllocations)
 	metricsAvailableHosts.Set(remainingCount)
 	metricsAvailableHostsPercent.Set(remainingPercent)
 }
@@ -128,8 +142,8 @@ func accumulatedHosts(networkCIDRs []string) uint32 {
 
 // calculateRemainingHosts is a helper function to calculate remaining hosts given total available hosts and the number of hosts that are already allocated.
 // this function returns both the total count of available hosts and a ratio (as a percent) of hosts left that are allocable.
-func calculateRemainingHosts(totalAvailableHosts, totalAllocatedHosts uint32) (float64, float64) {
-	return float64(totalAvailableHosts - totalAllocatedHosts), (1.0 - (float64(totalAllocatedHosts) / float64(totalAvailableHosts))) * 100
+func calculateRemainingHosts(totalAvailableHosts, totalAllocatedHosts, totalOverlappingStaticAllocations uint32) (float64, float64) {
+	return float64(totalAvailableHosts - totalOverlappingStaticAllocations - totalAllocatedHosts), (1.0 - (float64(totalAllocatedHosts) / float64(totalAvailableHosts-totalOverlappingStaticAllocations))) * 100
 }
 
 // GetMetricValue is a helper function from the metrics package to

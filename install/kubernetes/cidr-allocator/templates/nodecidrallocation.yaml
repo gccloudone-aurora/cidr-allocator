@@ -7,4 +7,5 @@ metadata:
 spec:
   nodeSelector: {{ toYaml .nodeSelector | nindent 4 }}
   addressPools: {{ toYaml .addressPools | nindent 4 }}
+  staticAllocations: {{ toYaml .staticAllocations | nindent 4 }}
 {{ end }}
