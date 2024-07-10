@@ -89,6 +89,13 @@ spec:
                         the correct size for the NodeCIDRAllocation Controller to allocate to it. If none is specified a subnet WILL NOT be allocated for the Node.
                 type: object
                 x-kubernetes-map-type: atomic
+              staticAllocations:
+                description: |-
+                  StaticAllocations represents a list of static address pools in the form of a list of
+                  network CIDRs that are reserved from being used by any node.
+                items:
+                  type: string
+                type: array
             type: object
           status:
             description: |-

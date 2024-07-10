@@ -244,7 +244,7 @@ func (r *NodeCIDRAllocationReconciler) Reconcile(ctx context.Context, req ctrl.R
 			}
 
 			for _, subnet := range subnets {
-				networkAllocated, err := statcan_net.NetworkAllocated(subnet, &allClusterNodes)
+				networkAllocated, err := statcan_net.NetworkAllocated(subnet, &allClusterNodes, nodeCIDRAllocation.Spec.StaticAllocations)
 				if err != nil {
 					rl.Error(
 						err,

@@ -52,9 +52,9 @@ func TestAccumulatedHosts(t *testing.T) {
 
 func TestCalculateRemainingHosts(t *testing.T) {
 	// Case 1: 64 available hosts and 16 allocated hosts
-	// expected: should return (48, 75) where 48 is the number of remaining addresses and 75 is the percentage representation of remaining addresses
-	got, gotP := calculateRemainingHosts(64, 16)
-	var want, wantP float64 = 48, 75
+	// expected: should return (48, 75) where 48 is the number of remaining addresses and 50 is the percentage representation of remaining addresses
+	got, gotP := calculateRemainingHosts(64, 24, 16)
+	var want, wantP float64 = 24, 50
 
 	if got != want || gotP != wantP {
 		t.Errorf("got (%.0f, %.0f), wanted (%.0f, %.0f)", got, gotP, want, wantP)

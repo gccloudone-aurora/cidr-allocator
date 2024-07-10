@@ -40,6 +40,12 @@ type NodeCIDRAllocationSpec struct {
 	//+kubebuilder:validation:MinItems=1
 	AddressPools []string `json:"addressPools,omitempty" protobuf:"bytes,7,opt,name=addressPools" patchStrategy:"merge"`
 
+	// StaticAllocations represents a list of static address pools in the form of a list of
+	// network CIDRs that are reserved from being used by any node.
+	//+optional
+	//+patchStrategy=merge
+	StaticAllocations []string `json:"staticAllocations,omitempty" protobuf:"bytes,7,opt,name=staticAllocations" patchStrategy:"merge"`
+
 	// NodeSelector represents a Kubernetes node selector to filter nodes from
 	// the cluster for which to apply Pod CIDRs onto.
 	// NOTE: Nodes that are selected through the node selector MUST specify a maximum number of pods in order to help identify

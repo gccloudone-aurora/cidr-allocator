@@ -100,6 +100,11 @@ func (in *NodeCIDRAllocationSpec) DeepCopyInto(out *NodeCIDRAllocationSpec) {
 		*out = make([]string, len(*in))
 		copy(*out, *in)
 	}
+	if in.StaticAllocations != nil {
+		in, out := &in.StaticAllocations, &out.StaticAllocations
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
 	if in.NodeSelector != nil {
 		in, out := &in.NodeSelector, &out.NodeSelector
 		*out = make(map[string]string, len(*in))
