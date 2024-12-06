@@ -209,8 +209,12 @@ func (r *NodeCIDRAllocationReconciler) Reconcile(ctx context.Context, req ctrl.R
 	// Begin allocation process
 	//
 
-	freeSubnets := make(map[uint8][]string)
+	// The subnets that were used as node podCIRD's in this reconcile
+	var allocatedSubnetInReconcile []string
 	for _, node := range matchingNodes.Items {
+		// The subnets that could have been used for the node's podCIDR in this iteration of the loop (exluding the one used for the node)
+		var remainingFreeSubnets []string
+
 		if node.Spec.PodCIDR != "" {
 			rl.V(1).Info("node already contains CIDR allocation. skipping",
 				"name", node.GetName(),
@@ -244,7 +248,8 @@ func (r *NodeCIDRAllocationReconciler) Reconcile(ctx context.Context, req ctrl.R
 			}
 
 			for _, subnet := range subnets {
-				networkAllocated, err := statcan_net.NetworkAllocated(subnet, &allClusterNodes, nodeCIDRAllocation.Spec.StaticAllocations)
+				// check that that the subnet IP space isn't already allocated by another node and doesn't overlap with allocatedSubnetInReconcile & staticAllocations
+				networkAllocated, err := statcan_net.NetworkAllocated(subnet, &allClusterNodes, append(allocatedSubnetInReconcile, nodeCIDRAllocation.Spec.StaticAllocations...))
 				if err != nil {
 					rl.Error(
 						err,
@@ -254,13 +259,20 @@ func (r *NodeCIDRAllocationReconciler) Reconcile(ctx context.Context, req ctrl.R
 					return ctrl.Result{}, r.finalizeReconcile(ctx, &nodeCIDRAllocation, &matchingNodes, err)
 				}
 
-				if !networkAllocated && !helper.StringInSlice(subnet, freeSubnets[requiredCIDRMask]) {
-					freeSubnets[requiredCIDRMask] = append(freeSubnets[requiredCIDRMask], subnet)
+				if !networkAllocated {
+					if node.Spec.PodCIDR != "" {
+						node.Spec.PodCIDR = subnet
+						allocatedSubnetInReconcile = append(allocatedSubnetInReconcile, subnet)
+
+						continue
+					}
+
+					remainingFreeSubnets = append(remainingFreeSubnets, subnet)
 				}
 			}
 		}
 
-		if len(freeSubnets[requiredCIDRMask]) == 0 {
+		if node.Spec.PodCIDR == "" {
 			rl.Info("unable to allocate podCIDR for node. no sufficient address space capacity for Node",
 				"name", node.GetName(),
 				"requiredSubnetCIDR", requiredCIDRMask,
@@ -277,8 +289,6 @@ func (r *NodeCIDRAllocationReconciler) Reconcile(ctx context.Context, req ctrl.R
 			return ctrl.Result{}, r.finalizeReconcile(ctx, &nodeCIDRAllocation, &matchingNodes, nil)
 		}
 
-		// Assign the first free subnet of the requested size PodCIDR to the Node
-		node.Spec.PodCIDR, freeSubnets[requiredCIDRMask] = freeSubnets[requiredCIDRMask][0], freeSubnets[requiredCIDRMask][1:]
 		if err := r.Update(ctx, &node); err != nil {
 			if apierrors.IsNotFound(err) {
 				// Node no longer found. It may have been deleted after reconcilliation request - return and do not requeue
@@ -287,7 +297,7 @@ func (r *NodeCIDRAllocationReconciler) Reconcile(ctx context.Context, req ctrl.R
 			rl.Error(err, "unable to set pod CIDR for Node resource",
 				"name", node.GetName(),
 				"podCIDR", node.Spec.PodCIDR,
-				"freeAvailable", freeSubnets,
+				"remainingFreeSubnets", remainingFreeSubnets,
 			)
 
 			return ctrl.Result{}, r.finalizeReconcile(ctx, &nodeCIDRAllocation, &matchingNodes, err)
@@ -297,7 +307,7 @@ func (r *NodeCIDRAllocationReconciler) Reconcile(ctx context.Context, req ctrl.R
 			"assigned PodCIDR to Node resource",
 			"name", node.GetName(),
 			"podCIDR", node.Spec.PodCIDR,
-			"remainingFreeSubnets", len(freeSubnets[requiredCIDRMask]),
+			"remainingFreeSubnets", len(remainingFreeSubnets),
 		)
 	}
 
