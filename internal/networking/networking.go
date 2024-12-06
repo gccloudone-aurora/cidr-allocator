@@ -98,7 +98,7 @@ func NetworksOverlap(a, b string) (bool, error) {
 // NetworkAllocated uses a variety of conditions to ensure that there is no
 // conflicting allocation that would present problems for subnet.
 // returns (true,nil) when the subnet provided is not allocated by or overlapping with any nodes.
-func NetworkAllocated(subnet string, nodes *corev1.NodeList, staticAllocations []string) (bool, error) {
+func NetworkAllocated(subnet string, nodes *corev1.NodeList, reservedSubnets []string) (bool, error) {
 	for _, n := range nodes.Items {
 		if n.Spec.PodCIDR == "" {
 			continue
@@ -114,8 +114,8 @@ func NetworkAllocated(subnet string, nodes *corev1.NodeList, staticAllocations [
 		}
 	}
 
-	for _, sa := range staticAllocations {
-		networksOverlap, err := NetworksOverlap(subnet, sa)
+	for _, s := range reservedSubnets {
+		networksOverlap, err := NetworksOverlap(subnet, s)
 		if err != nil {
 			return false, err
 		}
