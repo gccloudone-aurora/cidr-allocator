@@ -260,7 +260,7 @@ func (r *NodeCIDRAllocationReconciler) Reconcile(ctx context.Context, req ctrl.R
 				}
 
 				if !networkAllocated {
-					if node.Spec.PodCIDR != "" {
+					if node.Spec.PodCIDR == "" {
 						node.Spec.PodCIDR = subnet
 						allocatedSubnetInReconcile = append(allocatedSubnetInReconcile, subnet)
 
