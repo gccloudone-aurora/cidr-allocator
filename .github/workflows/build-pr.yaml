@@ -41,7 +41,7 @@ jobs:
           tags: ghcr.io/${{ github.repository }}:${{ env.TAG }}
           labels: ${{ steps.meta.outputs.labels }}
           build-args: |
-            IMAGE_REPOSITORY=gchr.io
+            IMAGE_REPOSITORY=docker.io/library
             VERSION=${{ env.TAG }}
       -
         name: Image digest
