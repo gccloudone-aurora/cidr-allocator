@@ -18,7 +18,7 @@ jobs:
 
       - name: Docker meta
         id: meta
-        uses: crazy-max/ghaction-docker-meta@v2
+        uses: docker/metadata-action@v5
         with:
           images: ${{ github.repository }}
           labels: |
