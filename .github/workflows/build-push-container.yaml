@@ -12,7 +12,7 @@ on:
       - 'main'
 
 jobs:
-  container-build-push:
+  build-push-container:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
