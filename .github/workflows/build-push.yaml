@@ -1,7 +1,13 @@
-name: Build Push Tags
+name: Build Push Containers
 
 on:
+  workflow_dispatch:
   push:
+    branches:
+      - 'main'
+    tags:
+      - 'v*'
+  pull_request:
     branches:
       - 'main'
 
@@ -12,22 +18,17 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Set environment variables
-        shell: bash
-        run: |
-          echo "TAG=${GITHUB_REF/refs\/tags\//}" >> $GITHUB_ENV
-          echo "GIT_SHA=${GITHUB_SHA}" >> $GITHUB_ENV
-
       - name: Docker meta
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ${{ github.repository }}
+          images: ghcr.io/${{ github.repository }}
           labels: |
-            org.opencontainers.image.vendor='GC Cloud One: Aurora'
-            org.opencontainers.image.licenses='https://github.com/${{ github.repository }}/blob/${{ env.GIT_SHA }}/LICENSE'
+            org.opencontainers.image.vendor="GC Cloud One: Aurora"
+            org.opencontainers.image.licenses="https://github.com/${{ github.repository }}/blob/main/LICENSE.md"
 
       - name: Log in to GitHub Container Registry
+        if: github.event_name != 'pull_request'
         uses: docker/login-action@v2
         with:
           registry: ghcr.io
@@ -38,12 +39,10 @@ jobs:
         id: docker_build
         uses: docker/build-push-action@v5
         with:
-          push: true
+          context: .
+          push: ${{ github.event_name != 'pull_request' }}
           tags: ghcr.io/${{ github.repository }}:${{ env.TAG }}
           labels: ${{ steps.meta.outputs.labels }}
-          build-args: |
-            IMAGE_REPOSITORY=docker.io/library
-            VERSION=${{ env.TAG }}
 
-      - name: Image digest SHA
-        run: echo ${{ steps.docker_build.outputs.digest }}
+      - name: Output Image Digest
+        run: echo "Image pushed with digest ${{ steps.docker_build.outputs.digest }}"
