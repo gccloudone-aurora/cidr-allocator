@@ -23,4 +23,22 @@ entries:
     urls:
     - https://github.com/gccloudone-aurora/cidr-allocator/releases/download/cidr-allocator-2.1.1/cidr-allocator-2.1.1.tgz
     version: 2.1.1
-generated: "2025-02-26T00:13:21.553600324Z"
+  - apiVersion: v2
+    appVersion: v1.4.2
+    created: "2025-02-27T18:54:18.541896116Z"
+    description: A Helm chart to deploy the STATCAN CIDR-Allocator Controller and
+      CRDs to a Kubernetes Cluster
+    digest: 3f5d7968d94623e2752dcba0ecb7f51a061339fe5860ef5b67d738e4bb8f6546
+    home: https://statcan.gc.ca
+    keywords:
+    - Kubernetes
+    - Networking
+    - Node
+    name: cidr-allocator
+    sources:
+    - https://github.com/StatCan/cidr-allocator
+    type: application
+    urls:
+    - https://github.com/gccloudone-aurora/cidr-allocator/releases/download/cidr-allocator-0.0.1/cidr-allocator-0.0.1.tgz
+    version: 0.0.1
+generated: "2025-02-27T18:54:18.541911555Z"
