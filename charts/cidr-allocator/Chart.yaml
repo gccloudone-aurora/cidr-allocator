@@ -9,11 +9,5 @@ keywords:
   - Kubernetes
   - Networking
   - Node
-
-version: 2.1.1
-kubeVersion: ">= 1.16.0-0"
+version: 0.0.1
 appVersion: "v1.4.2"
-
-maintainers:
-  - name: Ben Sykes
-    email: ben.sykes@statcan.gc.ca
