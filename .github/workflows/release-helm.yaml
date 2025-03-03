@@ -10,4 +10,4 @@ permissions:
 
 jobs:
   release-helm:
-    uses: gccloudone-aurora/.github/release-helm@workflows
+    uses: gccloudone-aurora/.github/.github/workflows/release-helm.yaml@workflows
