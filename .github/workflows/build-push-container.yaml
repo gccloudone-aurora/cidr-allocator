@@ -13,4 +13,4 @@ on:
 
 jobs:
   build-push-container:
-    uses: gccloudone-aurora/.github/.github/workflows/build-push-container.yaml@v1
+    uses: gccloudone-aurora/.github/.github/workflows/build-push-container.yaml@v2
